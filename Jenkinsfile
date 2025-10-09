@@ -12,18 +12,7 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '20'))  // Mantém as últimas 20 builds
     }
 
-    parameters {
-        booleanParam(
-            name: 'RUN_DEP_SCAN', 
-            defaultValue: true, 
-            description: 'Executar OWASP Dependency-Check?'
-        )
-        string(
-            name: 'FAIL_CVSS', 
-            defaultValue: '5.0', 
-            description: 'Inisira um valor de tolerância de CVSS (0-10), por exemplo: 5.0'
-        )
-    }
+    
 
     environment {
         DC_CACHE       = 'C:\\DC_CACHE'  // Diretório de cache para o Dependency-Check
