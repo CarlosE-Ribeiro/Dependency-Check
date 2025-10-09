@@ -4,8 +4,8 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.carloseduardo</groupId>     <!-- <- NÃO usar caminho de pasta -->
-  <artifactId>verificador-de-dependencia</artifactId>  
+  <groupId>com.carloseduardo</groupId>
+  <artifactId>verificador-de-dependencia</artifactId>
   <version>1.0.0-SNAPSHOT</version>
   <name>Dependency Check</name>
   <packaging>jar</packaging>
@@ -18,7 +18,7 @@
   </properties>
 
   <dependencies>
-    <!-- JUnit 5 para testes -->
+    <!-- JUnit 5 (testes) -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
@@ -29,7 +29,7 @@
 
   <build>
     <plugins>
-      <!-- Compilar com Java 21 -->
+      <!-- Compilação Java 21 -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -39,18 +39,17 @@
         </configuration>
       </plugin>
 
-      <!-- Executar testes JUnit 5 -->
+      <!-- Execução dos testes (gera XML p/ Jenkins) -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${surefire.version}</version>
         <configuration>
-          <!-- Garante descoberta do JUnit 5 -->
           <useModulePath>false</useModulePath>
         </configuration>
       </plugin>
 
-      <!-- Gera JAR executável -->
+      <!-- JAR executável -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
@@ -58,29 +57,21 @@
         <configuration>
           <archive>
             <manifest>
-              <mainClass>com.example.app.App</mainClass>
+              <mainClass>programa.Calculator</mainClass>
             </manifest>
           </archive>
         </configuration>
       </plugin>
 
+      <!-- OWASP Dependency-Check -->
       <plugin>
-      <groupId>org.owasp</groupId>
-      <artifactId>dependency-check-maven</artifactId>
-      <version>12.1.6</version>
-      <configuration>
-        <!-- Gera HTML e XML em target/ -->
-        <format>ALL</format>
-
-        <!-- Se quiser que o build falhe com CVSS alto, ative e ajuste o limite (0–10):
-        <failBuildOnCVSS></failBuildOnCVSS>
-        -->
-
-        <!-- Opcional: diretório local para cache (ajuda a não baixar dados sempre)
-        <dataDirectory>${user.home}/.m2/repository/org/owasp/dependency-check-data</dataDirectory>
-        -->
-      </configuration>
-    </plugin>
+        <groupId>org.owasp</groupId>
+        <artifactId>dependency-check-maven</artifactId>
+        <version>12.1.6</version>
+        <configuration>
+          <format>ALL</format>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 </project>

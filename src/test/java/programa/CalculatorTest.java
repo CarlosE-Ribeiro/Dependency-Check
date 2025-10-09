@@ -1,6 +1,7 @@
 package test.java.programa;
 
-import main.java.programa.Calculator;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals; // import estático
 
 public class CalculatorTest {
 
@@ -8,11 +9,6 @@ public class CalculatorTest {
     void add_deveSomarNumeros() {
         Calculator c = new Calculator();
         assertEquals(5, c.add(2, 3));
-    }
-
-    private void assertEquals(int i, int j) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'assertEquals'");
     }
 
     @Test
@@ -31,10 +27,5 @@ public class CalculatorTest {
     void divide_deveDividir() {
         Calculator c = new Calculator();
         assertEquals(2.5, c.divide(5, 2), 1e-4); // delta como terceiro argumento
-    }
-
-    private void assertEquals(double d, double divide, double e) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'assertEquals'");
     }
 }
