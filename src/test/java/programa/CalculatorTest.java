@@ -1,7 +1,8 @@
-package com.example.app;
+package test.java.programa;
 
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
+
+import main.java.programa.Calculator;
 
 class CalculatorTest {
 
@@ -10,6 +11,7 @@ class CalculatorTest {
         Calculator c = new Calculator();
         assertEquals(5, c.add(2, 3));
     }
+
 
     @Test
     void subtract_deveSubtrair() {
