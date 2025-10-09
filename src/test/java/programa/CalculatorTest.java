@@ -1,10 +1,7 @@
-package test.java.programa;
-
-import static org.junit.jupiter.api.Assertions.*;
+package com.example.app;
 
 import org.junit.jupiter.api.Test;
-
-import main.java.programa.Calculator;
+import static org.junit.jupiter.api.Assertions.*;
 
 class CalculatorTest {
 

@@ -1,4 +1,4 @@
-package main.java.programa;
+package com.example.app;
 
 public class Calculator {
 
