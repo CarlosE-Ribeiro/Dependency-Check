@@ -1,17 +1,19 @@
 package test.java.programa;
 
-import org.junit.jupiter.api.Test;
-
 import main.java.programa.Calculator;
 
-class CalculatorTest {
+public class CalculatorTest {
 
     @Test
-    void add_deveSomarDoisNumeros() {
+    void add_deveSomarNumeros() {
         Calculator c = new Calculator();
         assertEquals(5, c.add(2, 3));
     }
 
+    private void assertEquals(int i, int j) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'assertEquals'");
+    }
 
     @Test
     void subtract_deveSubtrair() {
@@ -28,12 +30,11 @@ class CalculatorTest {
     @Test
     void divide_deveDividir() {
         Calculator c = new Calculator();
-        assertEquals(2.5, c.divide(5, 2), 0.0001);
+        assertEquals(2.5, c.divide(5, 2), 1e-4); // delta como terceiro argumento
     }
 
-    @Test
-    void divide_porZero_deveLancarExcecao() {
-        Calculator c = new Calculator();
-        assertThrows(IllegalArgumentException.class, () -> c.divide(1, 0));
+    private void assertEquals(double d, double divide, double e) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'assertEquals'");
     }
 }

@@ -4,8 +4,8 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>main.java</groupId>
-  <artifactId>programa</artifactId>
+  <groupId>com.carloseduardo</groupId>     <!-- <- NÃO usar caminho de pasta -->
+  <artifactId>verificador-de-dependencia</artifactId>  
   <version>1.0.0-SNAPSHOT</version>
   <name>Dependency Check</name>
   <packaging>jar</packaging>
