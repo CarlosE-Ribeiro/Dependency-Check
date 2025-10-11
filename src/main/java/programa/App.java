@@ -1,8 +1,7 @@
-package main.java.programa;
+package programa;
 
 public class App {
     public static void main(String[] args) {
         System.out.println("Olá Jenkins! Build funcionando. ✅");
     }
 }
-    
