@@ -12,7 +12,7 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '20'))  // Mantém as últimas 20 builds
     }
 
-    
+    //parameters se for necessario
 
     environment {
         DC_CACHE       = 'C:\\DC_CACHE'  // Diretório de cache para o Dependency-Check
@@ -53,11 +53,11 @@ pipeline {
 
         stage('Dependency check') {
             steps {
-                dependencyCheck additionalArguments: '--format HTML --format XML', odcInstallation: 'OWASP-DC'
-                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+                dependencyCheck additionalArguments: '', nvdCredentialsId: 'nvd-api-key', odcInstallation: 'OWASP-DC', stopBuild: true
+                dependencyCheckPublisher pattern: '', stopBuild: true
             }
 
-        }
+        }//dependency
         
     }
 
