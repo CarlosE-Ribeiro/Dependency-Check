@@ -57,7 +57,7 @@
         <configuration>
           <archive>
             <manifest>
-              <mainClass>programa.HibernateValidator</mainClass>
+              <mainClass>programa.Exlog4j</mainClass>
             </manifest>
           </archive>
         </configuration>
