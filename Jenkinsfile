@@ -76,13 +76,6 @@ pipeline {
                 mvn -q org.apache.maven.plugins:maven-dependency-plugin:3.6.1:copy ^
                     -Dartifact=org.bouncycastle:bcprov-jdk18on:1.78.1 ^
                     -DoutputDirectory=target/dc-libs
-
-                rem === (opcional) Jackson Databind ===
-                mvn -q org.apache.maven.plugins:maven-dependency-plugin:3.6.1:get ^
-                    -Dartifact=com.fasterxml.jackson.core:jackson-databind:2.16.1
-                mvn -q org.apache.maven.plugins:maven-dependency-plugin:3.6.1:copy ^
-                    -Dartifact=com.fasterxml.jackson.core:jackson-databind:2.16.1 ^
-                    -DoutputDirectory=target/dc-libs
                 '''
             }
         }
