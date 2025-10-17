@@ -1,11 +1,5 @@
 package programa;
 
-import javax.validation.Validation;
-import javax.validation.Validator;
-import javax.validation.ValidatorFactory;
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.Positive;
-import javax.validation.ConstraintViolation;
 import java.util.Set;
 
 /**
