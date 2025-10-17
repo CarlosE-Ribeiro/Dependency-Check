@@ -2,6 +2,9 @@ package programa;
 
 import java.util.Set;
 
+import javax.xml.transform.Source;
+import javax.xml.validation.Validator;
+
 /**
  * Demonstra uma validação simples com Hibernate Validator (javax.validation).
  */
@@ -20,6 +23,9 @@ public class HibernateValidator{
         }
     }
 
+    /**
+     * @param args
+     */
     public static void main(String[] args) {
         // Cria o Validator
         ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
@@ -29,7 +35,7 @@ public class HibernateValidator{
         Usuario u = new Usuario("  ", -1);
 
         // Valida
-        Set<ConstraintViolation<Usuario>> violacoes = validator.validate(u);
+        final Set<ConstraintViolation<Usuario>> violacoes = validator.validate((Source) u);
 
         // Mostra resultado
         if (violacoes.isEmpty()) {
