@@ -57,7 +57,7 @@
         <configuration>
           <archive>
             <manifest>
-              <mainClass>programa.Calculator</mainClass>
+              <mainClass>programa.HibernateValidator</mainClass>
             </manifest>
           </archive>
         </configuration>
