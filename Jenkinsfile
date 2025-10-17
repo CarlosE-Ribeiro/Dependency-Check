@@ -51,35 +51,6 @@ pipeline {
             }
         }
 
-        stage('Libraries') {
-            steps {
-                bat '''
-                if not exist "target\\dc-libs" mkdir "target\\dc-libs"
-
-                rem === Hibernate Validator ===
-                mvn -q org.apache.maven.plugins:maven-dependency-plugin:3.6.1:get ^
-                    -Dartifact=org.hibernate.validator:hibernate-validator:8.0.1.Final
-                mvn -q org.apache.maven.plugins:maven-dependency-plugin:3.6.1:copy ^
-                    -Dartifact=org.hibernate.validator:hibernate-validator:8.0.1.Final ^
-                    -DoutputDirectory=target/dc-libs
-
-                rem === Netty ===
-                mvn -q org.apache.maven.plugins:maven-dependency-plugin:3.6.1:get ^
-                    -Dartifact=io.netty:netty-handler:4.1.109.Final
-                mvn -q org.apache.maven.plugins:maven-dependency-plugin:3.6.1:copy ^
-                    -Dartifact=io.netty:netty-handler:4.1.109.Final ^
-                    -DoutputDirectory=target/dc-libs
-
-                rem === Bouncy Castle ===
-                mvn -q org.apache.maven.plugins:maven-dependency-plugin:3.6.1:get ^
-                    -Dartifact=org.bouncycastle:bcprov-jdk18on:1.78.1
-                mvn -q org.apache.maven.plugins:maven-dependency-plugin:3.6.1:copy ^
-                    -Dartifact=org.bouncycastle:bcprov-jdk18on:1.78.1 ^
-                    -DoutputDirectory=target/dc-libs
-                '''
-            }
-        }
-
         stage('Dependency check') {
             steps {
                 dependencyCheck additionalArguments: '', nvdCredentialsId: 'nvd-api-key', odcInstallation: 'OWASP-DC', stopBuild: true
