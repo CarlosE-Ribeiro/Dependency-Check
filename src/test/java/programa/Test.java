@@ -1,4 +1,4 @@
-package test.java.programa;
+package programa;
 
 public @interface Test {
 
