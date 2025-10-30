@@ -1,18 +1,32 @@
 package programa;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class Teste {
-    private static final Logger logger = LogManager.getLogger(Teste.class);
 
     public static void main(String[] args) {
-        System.out.println("Iniciando aplicação de teste de vulnerabilidade...");
+        
+        System.out.println("Iniciando teste com Jackson-databind vulnerável...");
 
-        // Usando o logger para garantir que a dependência seja carregada.
-        // O código abaixo, em um ambiente vulnerável, poderia ser explorado.
-        logger.error("Este é um teste de log com uma dependência vulnerável.");
+        // Apenas instanciar e usar a classe é o suficiente
+        // para que o Maven a considere uma dependência real.
+        ObjectMapper mapper = new ObjectMapper();
 
-        System.out.println("Aplicação finalizada.");
+        try {
+            // Criar um JSON simples
+            String jsonString = "{\"nome\":\"Teste\"}";
+            
+            // Tentar "ler" o JSON
+            // Este é um uso padrão da biblioteca.
+            Object obj = mapper.readValue(jsonString, Object.class);
+            
+            System.out.println("Objeto deserializado: " + obj.toString());
+
+        } catch (Exception e) {
+            System.out.println("Ocorreu um erro no processamento do JSON: " + e.getMessage());
+        }
+
+        System.out.println("Teste com Jackson finalizado.");
     }
+    
 }
