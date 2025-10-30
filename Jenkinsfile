@@ -12,7 +12,19 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '20'))  // Mantém as últimas 20 builds
     }
 
-    
+    parameters {
+        // 1. NOVO PARÂMETRO "BOTÃO"
+        // Este é o botão de "liga/desliga" para o scan
+        booleanParam(name: 'EXECUTAR_VERIFICACAO_SEGURANCA', 
+                     defaultValue: true, 
+                     description: 'Marque esta caixa para executar a verificação de vulnerabilidades (OWASP Dependency-Check)')
+
+        // 2. PARÂMETRO ANTIGO
+        // Continua aqui, mas só será usado se o botão acima for marcado.
+        string(name: 'LIMITE_CVSS_FALHA', 
+               defaultValue: '7.0', 
+               description: 'Falhar o build se uma CVE tiver score CVSS igual ou superior a este valor (0.0 a 10.0)')
+    }
 
     stages {
 
@@ -44,26 +56,36 @@ pipeline {
         }
 
         stage('Dependency check') {
-            steps {
+           // steps {
                 //dependencyCheck additionalArguments: '', nvdCredentialsId: 'nvd-api-key', odcInstallation: 'OWASP-DC', stopBuild: true
                 //dependencyCheckPublisher pattern: '', stopBuild: true
-                bat 'mvn org.owasp:dependency-check-maven:check'
+                //bat 'mvn org.owasp:dependency-check-maven:check'
+           // }
+           when {
+                expression { return params.EXECUTAR_VERIFICACAO_SEGURANCA }
             }
-
-        }//dependency
-        
-    }
-
-    post {
-        always {
-
-            // O relatório HTML agora estará em 'target/'
-            archiveArtifacts artifacts: 'target/dependency-check-report.html', allowEmptyArchive: true
-
-            // O publisher vai procurar o XML gerado pelo Maven na pasta 'target/'
-            dependencyCheckPublisher pattern: 'target/dependency-check-report.xml'
-
-            echo "Pipeline finalizado"  // Executado ao final da pipeline, com sucesso ou erro
+            
+            steps {
+                script {
+                    try {
+                        // O comando agora usa o parâmetro de limite (renomeei para português)
+                        bat "mvn org.owasp:dependency-check-maven:check -Ddependency-check.failBuildOnCVSS=${params.LIMITE_CVSS_FALHA}"
+                    } catch (e) {
+                        currentBuild.result = 'FAILURE'
+                        error("Pipeline falhou devido a vulnerabilidades acima do score: ${params.LIMITE_CVSS_FALHA}")
+                    }
+                }
+            }
+            
+            // 6. MOVER O 'POST' PARA DENTRO DO STAGE
+            // Isso garante que os relatórios só sejam arquivados 
+            // SE este stage tiver sido executado.
+            post {
+                always {
+                    echo "Arquivando relatórios de segurança..."
+                    archiveArtifacts artifacts: 'target/dependency-check-report.html', allowEmptyArchive: true
+                    dependencyCheckPublisher pattern: 'target/dependency-check-report.xml'
+                }
+            }
         }
     }
-}
