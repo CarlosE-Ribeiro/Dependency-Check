@@ -12,7 +12,13 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '20'))  // Mantém as últimas 20 builds
     }
 
-    //parameters se for necessario
+
+    parameters {
+        string(name: 'CVSS_THRESHOLD', 
+               defaultValue: '5.0', 
+               description: 'Falhar o build se uma CVE tiver score CVSS igual ou superior a este valor (0.0 a 10.0)')
+    }
+
 
     environment {
         DC_CACHE       = 'C:\\DC_CACHE'  // Diretório de cache para o Dependency-Check
@@ -55,7 +61,16 @@ pipeline {
             steps {
                 //dependencyCheck additionalArguments: '', nvdCredentialsId: 'nvd-api-key', odcInstallation: 'OWASP-DC', stopBuild: true
                 //dependencyCheckPublisher pattern: '', stopBuild: true
-                bat 'mvn org.owasp:dependency-check-maven:check'
+                //bat 'mvn org.owasp:dependency-check-maven:check'
+                script {
+                    try {
+                        bat "mvn org.owasp:dependency-check-maven:check -Ddependency-check.failBuildOnCVSS=${params.CVSS_THRESHOLD}"
+                    } catch (e) {
+                        // Captura o erro para garantir que o pipeline pare
+                        currentBuild.result = 'FAILURE'
+                        error("Pipeline falhou devido a vulnerabilidades acima do score: ${params.CVSS_THRESHOLD}")
+                    }
+                }
             }
 
         }//dependency
