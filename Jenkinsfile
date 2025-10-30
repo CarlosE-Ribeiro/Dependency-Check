@@ -56,19 +56,14 @@ pipeline {
         }
 
         stage('Dependency check') {
-           // steps {
-                //dependencyCheck additionalArguments: '', nvdCredentialsId: 'nvd-api-key', odcInstallation: 'OWASP-DC', stopBuild: true
-                //dependencyCheckPublisher pattern: '', stopBuild: true
-                //bat 'mvn org.owasp:dependency-check-maven:check'
-           // }
-           when {
+            when {
                 expression { return params.EXECUTAR_VERIFICACAO_SEGURANCA }
             }
-            
+
             steps {
                 script {
                     try {
-                        // O comando agora usa o parâmetro de limite (renomeei para português)
+                        // O comando agora usa o parâmetro de limite
                         bat "mvn org.owasp:dependency-check-maven:check -Ddependency-check.failBuildOnCVSS=${params.LIMITE_CVSS_FALHA}"
                     } catch (e) {
                         currentBuild.result = 'FAILURE'
@@ -76,10 +71,7 @@ pipeline {
                     }
                 }
             }
-            
-            // 6. MOVER O 'POST' PARA DENTRO DO STAGE
-            // Isso garante que os relatórios só sejam arquivados 
-            // SE este stage tiver sido executado.
+
             post {
                 always {
                     echo "Arquivando relatórios de segurança..."
@@ -88,4 +80,5 @@ pipeline {
                 }
             }
         }
-    }
+    } // <- fecha stages
+} // <- fecha pipeline
