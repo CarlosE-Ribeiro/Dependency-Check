@@ -64,7 +64,7 @@ pipeline {
                 script {
                     try {
                         // O comando agora usa o parâmetro de limite
-                        bat "mvn org.owasp:dependency-check-maven:check -Ddependency-check.failBuildOnCVSS=${params.LIMITE_CVSS_FALHA}"
+                        bat "mvn org.owasp:dependency-check-maven:check -Dowasp.fail.threshold=${params.LIMITE_CVSS_FALHA}"
                     } catch (e) {
                         currentBuild.result = 'FAILURE'
                         error("Pipeline falhou devido a vulnerabilidades acima do score: ${params.LIMITE_CVSS_FALHA}")
