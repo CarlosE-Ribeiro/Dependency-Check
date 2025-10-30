@@ -53,8 +53,9 @@ pipeline {
 
         stage('Dependency check') {
             steps {
-                dependencyCheck additionalArguments: '', nvdCredentialsId: 'nvd-api-key', odcInstallation: 'OWASP-DC', stopBuild: true
-                dependencyCheckPublisher pattern: '', stopBuild: true
+                //dependencyCheck additionalArguments: '', nvdCredentialsId: 'nvd-api-key', odcInstallation: 'OWASP-DC', stopBuild: true
+                //dependencyCheckPublisher pattern: '', stopBuild: true
+                bat 'mvn org.owasp:dependency-check-maven:check'
             }
 
         }//dependency
@@ -63,6 +64,13 @@ pipeline {
 
     post {
         always {
+
+            // O relatório HTML agora estará em 'target/'
+            archiveArtifacts artifacts: 'target/dependency-check-report.html', allowEmptyArchive: true
+
+            // O publisher vai procurar o XML gerado pelo Maven na pasta 'target/'
+            dependencyCheckPublisher pattern: 'target/dependency-check-report.xml'
+
             echo "Pipeline finalizado"  // Executado ao final da pipeline, com sucesso ou erro
         }
     }
