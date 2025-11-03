@@ -77,7 +77,7 @@ pipeline {
             post {
                 always {
                     echo "Arquivando relatórios de segurança..."
-                    archiveArtifacts artifacts: 'target/dependency-check-report.html', 'target/dependency-check-report.json',     allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'target/dependency-check-report.html, target/dependency-check-report.json' allowEmptyArchive: true
                     dependencyCheckPublisher pattern: 'target/dependency-check-report.xml'
                 }
             }
