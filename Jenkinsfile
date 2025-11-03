@@ -77,7 +77,11 @@ pipeline {
             post {
                 always {
                     echo "Arquivando relatórios de segurança..."
-                    archiveArtifacts artifacts: 'target/dependency-check-report.html, target/dependency-check-report.json' allowEmptyArchive: true
+                    // Arquiva os 3 formatos principais
+                    archiveArtifacts artifacts: 'target/dependency-check-report.html, target/dependency-check-report.json, target/dependency-check-report.xml', 
+                                     allowEmptyArchive: true
+                    
+                    // O Publisher usa o XML para os gráficos do Jenkins
                     dependencyCheckPublisher pattern: 'target/dependency-check-report.xml'
                 }
             }
