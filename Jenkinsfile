@@ -62,6 +62,8 @@ pipeline {
 
             steps {
                 script {
+                    // Força o download das últimas definições de CVEs
+                    bat "mvn org.owasp:dependency-check-maven:update-only"
                     try {
                         // O comando agora usa o parâmetro de limite
                         bat "mvn org.owasp:dependency-check-maven:check -Dowasp.fail.threshold=${params.LIMITE_CVSS_FALHA}"
