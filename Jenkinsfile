@@ -74,6 +74,24 @@ pipeline {
                 }
             }
 
+            stage('Gerar Relatório com IA') {
+            when {
+                expression { return params.EXECUTAR_VERIFICACAO_SEGURANCA }
+            }
+            
+            // ADICIONE ESTE BLOCO 'environment'
+            environment {
+                // Puxa a credencial 'gemini-api-key' que você criou no Jenkins
+                // e a coloca na variável de ambiente 'API_KEY_GEMINI'
+                API_KEY_GEMINI = credentials('gemini-api-key')
+            }
+            
+            steps {
+                echo "Executando script Python para gerar relatório HTML com IA..."
+                // Agora, quando o 'gerar_relatorio.py' rodar, 
+                // ele terá acesso à variável 'API_KEY_GEMINI'
+                bat 'python gerar_relatorio.py'
+
             post {
                 always {
                     echo "Arquivando relatórios de segurança..."
@@ -83,6 +101,8 @@ pipeline {
                     
                     // O Publisher usa o XML para os gráficos do Jenkins
                     dependencyCheckPublisher pattern: 'target/dependency-check-report.xml'
+
+                    archiveArtifacts artifacts: 'relatorio_vulnerabilidades.html', allowEmptyArchive: true
                 }
             }
         }
