@@ -1,110 +1,151 @@
+// Início do pipeline declarativo do Jenkins
 pipeline {
+    // O agente "any" indica que este pipeline pode rodar em qualquer nó disponível
     agent any
 
-    // Ajuste os nomes conforme "Manage Jenkins » Tools"
+    // Define as ferramentas que o Jenkins vai usar (configuradas em "Manage Jenkins » Tools")
     tools {
-        jdk 'jdk-21'            // ex.: JDK 21 instalado no Jenkins
-        maven 'maven-3.9'       // ex.: Maven 3.x instalado no Jenkins
+        jdk 'jdk-21'      // Usa o JDK 21 configurado no Jenkins
+        maven 'maven-3.9' // Usa o Maven 3.9 configurado no Jenkins
     }
 
+    // Opções gerais do pipeline
     options {
-        timestamps()                                // Adiciona timestamps nos logs
-        buildDiscarder(logRotator(numToKeepStr: '20'))  // Mantém as últimas 20 builds
+        timestamps() // Adiciona timestamps aos logs do console (útil para debug e auditoria)
+        buildDiscarder(logRotator(numToKeepStr: '20')) // Mantém apenas as 20 últimas execuções no histórico
     }
 
+    // Declaração de parâmetros que o usuário pode ajustar antes de rodar o pipeline
     parameters {
-        // 1. NOVO PARÂMETRO "BOTÃO"
-        // Este é o botão de "liga/desliga" para o scan
-        booleanParam(name: 'EXECUTAR_VERIFICACAO_SEGURANCA', 
-                     defaultValue: true, 
-                     description: 'Marque esta caixa para executar a verificação de vulnerabilidades (OWASP Dependency-Check)')
+        // Parâmetro booleano (checkbox) para ativar ou não a verificação de vulnerabilidades
+        booleanParam(
+            name: 'EXECUTAR_VERIFICACAO_SEGURANCA',
+            defaultValue: true,
+            description: 'Marque esta caixa para executar a verificação de vulnerabilidades (OWASP Dependency-Check)'
+        )
 
-        // 2. PARÂMETRO ANTIGO
-        // Continua aqui, mas só será usado se o botão acima for marcado.
-        string(name: 'LIMITE_CVSS_FALHA', 
-               defaultValue: '7.0', 
-               description: 'Falhar o build se uma CVE tiver score CVSS igual ou superior a este valor (0.0 a 10.0)')
+        // Parâmetro numérico (em formato string) que define o limite de CVSS que causa falha no build
+        string(
+            name: 'LIMITE_CVSS_FALHA',
+            defaultValue: '7.0',
+            description: 'Falhar o build se uma CVE tiver score CVSS igual ou superior a este valor (0.0 a 10.0)'
+        )
     }
 
+    // ============================
+    //  DEFINIÇÃO DAS ETAPAS
+    // ============================
     stages {
 
+        // ------------------------------
+        // Etapa 1: Compilação do projeto
+        // ------------------------------
         stage('Build') {
             steps {
+                // Executa comando Maven no Windows (bat)
+                // -B: modo batch (sem prompts interativos)
+                // -DskipTests: pula a execução dos testes
                 bat '''
                     mvn -B -DskipTests clean package
-                ''' // Compila o projeto sem rodar os testes
+                '''
             }
             post {
+                // Sempre executa, mesmo que a compilação falhe
                 always {
+                    // Arquiva o .jar gerado no Jenkins (para download)
                     archiveArtifacts artifacts: 'target/*.jar', allowEmptyArchive: true
+                    // Gera um "fingerprint" do artefato para rastreamento entre builds
                     fingerprint 'target/*.jar'
                 }
             }
         }
 
+        // ------------------------------
+        // Etapa 2: Execução dos testes
+        // ------------------------------
         stage('Test') {
             steps {
+                // Roda os testes com Maven
                 bat '''
                     mvn -B test
-                ''' // Executa os testes automatizados
+                '''
             }
             post {
                 always {
+                    // Publica os resultados de testes no Jenkins (Junit plugin)
                     junit allowEmptyResults: true, testResults: '**/surefire-reports/*.xml'
                 }
             }
         }
 
+        // ------------------------------------------
+        // Etapa 3: Verificação de vulnerabilidades
+        // ------------------------------------------
         stage('Dependency check') {
+            // Só executa se o parâmetro EXECUTAR_VERIFICACAO_SEGURANCA estiver marcado
             when {
                 expression { return params.EXECUTAR_VERIFICACAO_SEGURANCA }
             }
 
             steps {
                 script {
-                    // Força o download das últimas definições de CVEs
+                    // Atualiza o banco de dados de CVEs do OWASP Dependency-Check
                     bat "mvn org.owasp:dependency-check-maven:update-only"
+
                     try {
-                        // O comando agora usa o parâmetro de limite
+                        // Executa a verificação de dependências com base no limite definido pelo usuário
                         bat "mvn org.owasp:dependency-check-maven:check -Dowasp.fail.threshold=${params.LIMITE_CVSS_FALHA}"
                     } catch (e) {
+                        // Se o comando acima retornar erro (falhas encontradas), o build é marcado como FAILED
                         currentBuild.result = 'FAILURE'
                         error("Pipeline falhou devido a vulnerabilidades acima do score: ${params.LIMITE_CVSS_FALHA}")
                     }
                 }
             }
+        }
 
-            stage('Gerar Relatório com IA') {
+        // ------------------------------------------
+        // Etapa 4: Geração de relatório com IA
+        // ------------------------------------------
+        stage('Gerar Relatório com IA') {
+            // Também só executa se o parâmetro de segurança estiver marcado
             when {
                 expression { return params.EXECUTAR_VERIFICACAO_SEGURANCA }
             }
-            
-            // ADICIONE ESTE BLOCO 'environment'
+
+            // Define variáveis de ambiente disponíveis dentro da etapa
             environment {
-                // Puxa a credencial 'gemini-api-key' que você criou no Jenkins
-                // e a coloca na variável de ambiente 'API_KEY_GEMINI'
+                // Busca a credencial 'gemini-api-key' do Jenkins e
+                // atribui ao ambiente como variável 'API_KEY_GEMINI'
                 API_KEY_GEMINI = credentials('gemini-api-key')
             }
-            
+
             steps {
+                // Apenas exibe mensagem no console
                 echo "Executando script Python para gerar relatório HTML com IA..."
-                // Agora, quando o 'gerar_relatorio.py' rodar, 
-                // ele terá acesso à variável 'API_KEY_GEMINI'
+
+                // Executa o script Python que usa a chave Gemini para gerar relatório inteligente
                 bat 'python gerar_relatorio.py'
-
-            post {
-                always {
-                    echo "Arquivando relatórios de segurança..."
-                    // Arquiva os 3 formatos principais
-                    archiveArtifacts artifacts: 'target/dependency-check-report.html, target/dependency-check-report.json, target/dependency-check-report.xml', 
-                                     allowEmptyArchive: true
-                    
-                    // O Publisher usa o XML para os gráficos do Jenkins
-                    dependencyCheckPublisher pattern: 'target/dependency-check-report.xml'
-
-                    archiveArtifacts artifacts: 'relatorio_vulnerabilidades.html', allowEmptyArchive: true
-                }
             }
         }
-    } // <- fecha stages
-} // <- fecha pipeline
+    } // <-- Fim das etapas (stages)
+
+    // ============================
+    //  AÇÕES PÓS-BUILD
+    // ============================
+    post {
+        always {
+            echo "Arquivando relatórios de segurança..."
+
+            // Arquiva os relatórios do OWASP Dependency-Check em vários formatos
+            archiveArtifacts artifacts: 'target/dependency-check-report.html, target/dependency-check-report.json, target/dependency-check-report.xml',
+                             allowEmptyArchive: true
+
+            // Publica o XML para o plugin "OWASP Dependency Check" gerar gráficos no Jenkins
+            dependencyCheckPublisher pattern: 'target/dependency-check-report.xml'
+
+            // Arquiva o relatório final gerado com IA
+            archiveArtifacts artifacts: 'relatorio_vulnerabilidades.html', allowEmptyArchive: true
+        }
+    }
+}
