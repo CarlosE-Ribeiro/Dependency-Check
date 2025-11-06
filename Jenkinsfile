@@ -125,7 +125,7 @@ pipeline {
                 echo "Executando script Python para gerar relatório HTML com IA..."
 
                 // Executa o script Python que usa a chave Gemini para gerar relatório inteligente
-                bat 'python report.py'
+                bat 'py report.py'
             }
         }
     } // <-- Fim das etapas (stages)
