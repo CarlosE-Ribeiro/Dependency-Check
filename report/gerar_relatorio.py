@@ -3,7 +3,6 @@ import json
 import os
 import logging
 from pathlib import Path
-from keys import API_KEY
 
 # --- CONFIGURAÇÃO ---
 # 1. LEIA A API KEY DA VARIÁVEL DE AMBIENTE
