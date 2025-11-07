@@ -1,20 +1,24 @@
+# report/gerar_relatorio.py
 import json
 import os
 import logging
 import urllib.request
+import urllib.error
 import re
 import ssl
 from pathlib import Path
 
-# ------------ Config -------------
+# ===================== Configurações =====================
 API_KEY = os.environ.get('API_KEY_GEMINI', 'ERRO_KEY_NAO_DEFINIDA')
-GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-1.5-flash')  # pode trocar por gemini-1.5-pro
+# Se quiser fixar via env, defina GEMINI_MODEL=gemini-1.5-flash-latest (ou pro-latest)
+GEMINI_MODEL_ENV = os.environ.get('GEMINI_MODEL', '').strip()
+
 JSON_INPUT_PATH = "target/dependency-check-report.json"
 HTML_OUTPUT_PATH = "relatorio_vulnerabilidades.html"
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Opcional: garantir UTF-8 no Windows/Jenkins
+# Garantir UTF-8 no stdout/stderr (útil no Jenkins/Windows)
 try:
     import sys
     os.environ.setdefault("PYTHONIOENCODING", "utf-8")
@@ -22,9 +26,13 @@ try:
     sys.stderr.reconfigure(encoding='utf-8')
 except Exception:
     pass
-# ---------------------------------
+# ========================================================
+
 
 def analisar_json(filepath):
+    """
+    Lê o relatório do OWASP Dependency-Check (JSON) e extrai as vulnerabilidades.
+    """
     logging.info(f"Analisando o arquivo JSON em: {filepath}")
     vulnerabilidades_encontradas = []
     try:
@@ -54,11 +62,15 @@ def analisar_json(filepath):
         logging.error(f"ERRO: Arquivo JSON não encontrado em {filepath}")
         return []
     except json.JSONDecodeError:
-        logging.error(f"ERRO: Falha ao decodificar o JSON. O arquivo está corrompido?")
+        logging.error("ERRO: Falha ao decodificar o JSON. O arquivo está corrompido?")
         return []
 
+
 def _first_json_block(texto: str) -> str | None:
-    """Extrai o primeiro bloco { ... } bem-formado da string."""
+    """
+    Extrai o primeiro bloco { ... } bem-formado da string.
+    Útil quando o modelo devolve texto + JSON.
+    """
     stack = 0
     start = -1
     for i, ch in enumerate(texto):
@@ -73,15 +85,80 @@ def _first_json_block(texto: str) -> str | None:
                     return texto[start:i+1]
     return None
 
+
+# ---------- Descoberta e escolha de modelo (robusto) ----------
+_PREFERRED_MODELS = [
+    GEMINI_MODEL_ENV,  # respeita variável de ambiente se definida
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-pro-latest",
+    "gemini-1.5-flash-002",
+    "gemini-1.5-pro-002",
+]
+
+def _list_models():
+    """
+    Lista modelos disponíveis na API e seus métodos suportados.
+    Retorna a lista crua vinda da API.
+    """
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={API_KEY}"
+    req = urllib.request.Request(url, method='GET')
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        data = json.loads(resp.read().decode('utf-8', errors='replace'))
+    return data.get("models", []) or []
+
+def _pick_model() -> str | None:
+    """
+    Escolhe um modelo que exista e suporte generateContent.
+    Prioriza _PREFERRED_MODELS; se a listagem falhar, ainda tenta os nomes “no escuro”.
+    """
+    if API_KEY == 'ERRO_KEY_NAO_DEFINIDA':
+        return None
+
+    models = []
+    supported = {}
+    try:
+        models = _list_models()
+        for m in models:
+            name = m.get("name", "")                # ex: "models/gemini-1.5-flash-latest"
+            methods = set(m.get("supportedGenerationMethods") or [])
+            supported[name] = methods
+    except Exception:
+        # Se não conseguir listar, tentaremos com os candidatos mesmo assim
+        supported = {}
+
+    # Tenta na ordem preferida
+    for cand in [m for m in _PREFERRED_MODELS if m]:
+        full = f"models/{cand}"
+        if not supported:
+            # Sem listagem: tentar “no escuro” esse cand
+            return cand
+        # Com listagem: valida existência + método
+        if full in supported and "generateContent" in supported[full]:
+            return cand
+
+    # Como fallback final, pega o primeiro modelo listado que suporte generateContent
+    for full, methods in supported.items():
+        if "generateContent" in methods:
+            return full.split("/", 1)[1]  # retorna apenas o sufixo após "models/"
+    return None
+# -------------------------------------------------------------
+
+
 def obter_dados_ia(cve, dependencia, descricao_en):
     """
     Pergunta ao Gemini a SOLUÇÃO e a TRADUÇÃO usando urllib (API v1beta).
+    Retorna (descricao_pt, solucao).
     """
     logging.info(f"Consultando IA (via urllib) para dados da {cve}...")
 
-    # Endpoint correto (v1beta) + modelo configurável
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={API_KEY}"
+    model = _pick_model()
+    if not model:
+        logging.error("Nenhum modelo Gemini disponível/compatível encontrado para generateContent.")
+        fallback_desc = f"(Tradução falou) {descricao_en}"
+        fallback_sol = "Falha ao consultar a IA para uma solução."
+        return fallback_desc, fallback_sol
 
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={API_KEY}"
     logging.info(f"VERIFICAÇÃO DE URL: Estou chamando: {url}")
 
     prompt_texto = (
@@ -146,12 +223,16 @@ def obter_dados_ia(cve, dependencia, descricao_en):
         logging.error(f"Resposta BRUTA da API: {raw_response_text}")
         logging.error("==========================================")
 
-    # Fallback (mantive seu 'falou' para você distinguir versões)
+    # Fallback (mantido seu 'falou' para identificar versão)
     fallback_desc = f"(Tradução falou) {descricao_en}"
     fallback_sol = "Falha ao consultar a IA para uma solução."
     return fallback_desc, fallback_sol
 
+
 def gerar_relatorio_html(dados_finais, output_path):
+    """
+    Gera o HTML de saída com a tabela de vulnerabilidades + soluções.
+    """
     logging.info(f"Gerando relatório HTML em: {output_path}")
     html_style = """
     <style>
@@ -222,20 +303,24 @@ def gerar_relatorio_html(dados_finais, output_path):
     except Exception as e:
         logging.error(f"Falha ao salvar o arquivo HTML. Erro: {e}")
 
+
 def main():
     if API_KEY == 'ERRO_KEY_NAO_DEFINIDA':
         logging.error("A variável de ambiente 'API_KEY_GEMINI' não foi definida no Jenkins.")
         return
+
     vulnerabilidades = analisar_json(JSON_INPUT_PATH)
     if not vulnerabilidades:
         logging.info("Nenhuma vulnerabilidade encontrada ou o arquivo JSON está vazio. Saindo.")
         return
+
     dados_com_solucao = []
     for vuln in vulnerabilidades:
-        # pule leves/desconhecidas
+        # pula leves/desconhecidas
         if vuln['severidade'] in ['LOW', 'Desconhecida']:
             logging.info(f"Pulando {vuln['cve']} (Severidade: {vuln['severidade']}).")
             continue
+
         descricao_pt, solucao = obter_dados_ia(
             vuln['cve'],
             vuln['dependencia'],
@@ -248,10 +333,13 @@ def main():
             "descricao_pt": descricao_pt,
             "solucao": solucao
         })
+
     if not dados_com_solucao:
         logging.info("Nenhuma vulnerabilidade (Moderada ou superior) encontrada para gerar relatório.")
         return
+
     gerar_relatorio_html(dados_com_solucao, HTML_OUTPUT_PATH)
+
 
 if __name__ == "__main__":
     main()
