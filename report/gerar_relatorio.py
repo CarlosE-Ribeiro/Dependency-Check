@@ -1,8 +1,9 @@
-import google.generativeai as genai
 import json
 import os
 import logging
-import re  # <-- IMPORTA O MÓDULO DE REGEX
+import urllib.request  # <--- Usando a biblioteca nativa
+import re
+import ssl
 from pathlib import Path
 
 # --- CONFIGURAÇÃO ---
@@ -13,19 +14,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # --- FUNÇÕES ---
 
-def configurar_ia():
-    # ... (esta função continua igual à anterior) ...
-    try:
-        genai.configure(api_key=API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        logging.info("Modelo Gemini configurado com sucesso.")
-        return model
-    except Exception as e:
-        logging.error(f"Falha ao configurar a API do Gemini. Verifique sua API Key. Erro: {e}")
-        return None
-
 def analisar_json(filepath):
-    # ... (esta função continua igual à anterior) ...
+    """Lê o JSON do OWASP e extrai a lista de vulnerabilidades."""
     logging.info(f"Analisando o arquivo JSON em: {filepath}")
     vulnerabilidades_encontradas = []
     try:
@@ -58,15 +48,17 @@ def analisar_json(filepath):
         logging.error(f"ERRO: Falha ao decodificar o JSON. O arquivo está corrompido?")
         return []
 
-def obter_dados_ia(modelo, cve, dependencia, descricao_en):
+def obter_dados_ia(cve, dependencia, descricao_en):
     """
-    Pergunta ao Gemini a SOLUÇÃO e a TRADUÇÃO.
-    Agora usa REGEX para garantir que o JSON seja extraído.
+    Pergunta ao Gemini a SOLUÇÃO e a TRADUÇÃO usando urllib.
     """
-    logging.info(f"Consultando IA para dados da {cve}...")
+    logging.info(f"Consultando IA (via urllib) para dados da {cve}...")
+
+    # --- A GRANDE MUDANÇA ESTÁ AQUI ---
+    # Usando a API v1 (moderna) e o modelo gemini-1.5-flash
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
     
-    # --- PROMPT ATUALIZADO (MAIS RIGOROSO) ---
-    prompt = f"""
+    prompt_texto = f"""
     Você é um assistente de cibersegurança.
     Analise a vulnerabilidade:
     - CVE: {cve}
@@ -84,38 +76,55 @@ def obter_dados_ia(modelo, cve, dependencia, descricao_en):
     }}
     """
     
+    # O payload da API 'v1' é um pouco diferente
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": prompt_texto}
+                ]
+            }
+        ]
+    }
+    
+    data = json.dumps(payload).encode('utf-8')
+    headers = {"Content-Type": "application/json"}
+
     raw_response_text = ""
     try:
-        response = modelo.generate_content(prompt)
-        raw_response_text = response.text
+        req = urllib.request.Request(url, data=data, headers=headers, method='POST')
         
-        # --- LÓGICA DE PARSING ATUALIZADA ---
-        # Tenta encontrar o JSON usando regex, mesmo que a IA tenha "conversado"
-        match = re.search(r"\{.*\}", raw_response_text, re.DOTALL)
+        # Adiciona um contexto SSL (boa prática)
+        context = ssl.create_default_context()
         
-        if not match:
-            # Se não achou um JSON, falha e vai para o 'except'
-            raise ValueError("Nenhum JSON válido encontrado na resposta da IA")
+        with urllib.request.urlopen(req, context=context) as response:
+            response_body = response.read().decode('utf-8')
+            raw_response_text = response_body
+            response_json = json.loads(response_body)
+            
+            # Navega na resposta JSON
+            solucao_bruta = response_json['candidates'][0]['content']['parts'][0]['text']
+            
+            # A IA ainda pode ser "tagarela", então usamos regex
+            match = re.search(r"\{.*\}", solucao_bruta, re.DOTALL)
+            if not match:
+                raise ValueError("Nenhum JSON válido encontrado na resposta da IA")
 
-        # Decodifica o JSON que o regex encontrou
-        dados_ia = json.loads(match.group(0))
-        
-        return dados_ia.get('descricao_pt', 'IA falhou em gerar descrição.'), \
-               dados_ia.get('solucao', 'IA falhou em gerar solução.')
+            dados_ia = json.loads(match.group(0))
+            return dados_ia.get('descricao_pt', 'IA falhou em gerar descrição.'), \
+                   dados_ia.get('solucao', 'IA falhou em gerar solução.')
 
     except Exception as e:
-        # --- LOG DE ERRO MELHORADO ---
-        logging.error(f"===== FALHA AO PROCESSAR IA para {cve} =====")
+        logging.error(f"===== FALHA AO PROCESSAR IA (urllib) para {cve} =====")
         logging.error(f"Erro: {e}")
-        logging.error(f"Resposta BRUTA da IA: {raw_response_text}")
+        logging.error(f"Resposta BRUTA da API: {raw_response_text}")
         logging.error("==========================================")
-        
         fallback_desc = f"(Tradução falhou) {descricao_en}"
         fallback_sol = "Falha ao consultar a IA para uma solução."
         return fallback_desc, fallback_sol
 
 def gerar_relatorio_html(dados_finais, output_path):
-    # ... (esta função continua igual à anterior, com o CSS e a tabela) ...
+    # ... (Esta função continua EXATAMENTE igual, com o CSS e a tabela) ...
     logging.info(f"Gerando relatório HTML em: {output_path}")
     html_style = """
     <style>
@@ -186,24 +195,25 @@ def gerar_relatorio_html(dados_finais, output_path):
         logging.error(f"Falha ao salvar o arquivo HTML. Erro: {e}")
 
 def main():
-    # ... (esta função continua igual à anterior) ...
+    # ... (Esta função continua EXATAMENTE igual) ...
     if API_KEY == 'ERRO_KEY_NAO_DEFINIDA':
         logging.error("A variável de ambiente 'API_KEY_GEMINI' não foi definida no Jenkins.")
         return
-    modelo_ia = configurar_ia()
-    if not modelo_ia:
-        return
+    # Note que não configuramos mais a IA aqui
+    
     vulnerabilidades = analisar_json(JSON_INPUT_PATH)
     if not vulnerabilidades:
         logging.info("Nenhuma vulnerabilidade encontrada ou o arquivo JSON está vazio. Saindo.")
         return
+    
     dados_com_solucao = []
     for vuln in vulnerabilidades:
         if vuln['severidade'] in ['LOW', 'Desconhecida']:
              logging.info(f"Pulando {vuln['cve']} (Severidade: {vuln['severidade']}).")
              continue
+        
+        # A chamada da função mudou, não passamos mais o "modelo"
         descricao_pt, solucao = obter_dados_ia(
-            modelo_ia, 
             vuln['cve'], 
             vuln['dependencia'], 
             vuln['descricao_en']
