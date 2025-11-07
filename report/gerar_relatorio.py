@@ -17,8 +17,8 @@ def configurar_ia():
     # ... (esta função continua igual à anterior) ...
     try:
         genai.configure(api_key=API_KEY)
-        model = genai.GenerativeModel('gemini-pro')
-        logging.info("Modelo Gemini (gemini-pro) configurado com sucesso.")
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        logging.info("Modelo Gemini configurado com sucesso.")
         return model
     except Exception as e:
         logging.error(f"Falha ao configurar a API do Gemini. Verifique sua API Key. Erro: {e}")
