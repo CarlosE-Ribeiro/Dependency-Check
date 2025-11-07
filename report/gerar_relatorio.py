@@ -1,21 +1,19 @@
 import json
 import os
 import logging
-import urllib.request  # <--- Usando a biblioteca nativa
+import urllib.request
 import re
 import ssl
 from pathlib import Path
 
-# --- CONFIGURAÇÃO ---
+# ... (Configuração igual) ...
 API_KEY = os.environ.get('API_KEY_GEMINI', 'ERRO_KEY_NAO_DEFINIDA')
 JSON_INPUT_PATH = "target/dependency-check-report.json"
 HTML_OUTPUT_PATH = "relatorio_vulnerabilidades.html"
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# --- FUNÇÕES ---
-
 def analisar_json(filepath):
-    """Lê o JSON do OWASP e extrai a lista de vulnerabilidades."""
+    # ... (Esta função está 100% correta, não mexe) ...
     logging.info(f"Analisando o arquivo JSON em: {filepath}")
     vulnerabilidades_encontradas = []
     try:
@@ -54,9 +52,14 @@ def obter_dados_ia(cve, dependencia, descricao_en):
     """
     logging.info(f"Consultando IA (via urllib) para dados da {cve}...")
 
-    # --- CHAMANDO A API v1beta (CORRETA) ---
+    # A URL que DEVERIA estar sendo usada
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
     
+    # --- O "DEDO-DURO" ESTÁ AQUI ---
+    # Esta linha vai nos dizer qual versão do script está rodando
+    logging.info(f"VERIFICAÇÃO DE URL: Estou chamando: {url}")
+    # ---------------------------------
+
     prompt_texto = f"""
     Você é um assistente de cibersegurança.
     Analise a vulnerabilidade:
@@ -75,50 +78,37 @@ def obter_dados_ia(cve, dependencia, descricao_en):
     }}
     """
     
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": prompt_texto}
-                ]
-            }
-        ]
-    }
-    
+    payload = { "contents": [ { "parts": [ {"text": prompt_texto} ] } ] }
     data = json.dumps(payload).encode('utf-8')
     headers = {"Content-Type": "application/json"}
-
     raw_response_text = ""
+
     try:
         req = urllib.request.Request(url, data=data, headers=headers, method='POST')
         context = ssl.create_default_context()
-        
         with urllib.request.urlopen(req, context=context) as response:
+            # ... (resto do try...catch... igual ao anterior) ...
             response_body = response.read().decode('utf-8')
             raw_response_text = response_body
             response_json = json.loads(response_body)
-            
             solucao_bruta = response_json['candidates'][0]['content']['parts'][0]['text']
-            
             match = re.search(r"\{.*\}", solucao_bruta, re.DOTALL)
             if not match:
                 raise ValueError("Nenhum JSON válido encontrado na resposta da IA")
-
             dados_ia = json.loads(match.group(0))
             return dados_ia.get('descricao_pt', 'IA falhou em gerar descrição.'), \
                    dados_ia.get('solucao', 'IA falhou em gerar solução.')
-
     except Exception as e:
         logging.error(f"===== FALHA AO PROCESSAR IA (urllib) para {cve} =====")
         logging.error(f"Erro: {e}")
         logging.error(f"Resposta BRUTA da API: {raw_response_text}")
         logging.error("==========================================")
-        fallback_desc = f"(Tradução falhou) {descricao_en}"
+        fallback_desc = f"(Tradução falou) {descricao_en}" # Mudei para "falou" para sabermos se o script novo rodou
         fallback_sol = "Falha ao consultar a IA para uma solução."
         return fallback_desc, fallback_sol
 
 def gerar_relatorio_html(dados_finais, output_path):
-    """Cria o arquivo HTML com o CSS embutido."""
+    # ... (Esta função está 100% correta, não mexe) ...
     logging.info(f"Gerando relatório HTML em: {output_path}")
     html_style = """
     <style>
@@ -189,21 +179,19 @@ def gerar_relatorio_html(dados_finais, output_path):
         logging.error(f"Falha ao salvar o arquivo HTML. Erro: {e}")
 
 def main():
+    # ... (Esta função está 100% correta, não mexe) ...
     if API_KEY == 'ERRO_KEY_NAO_DEFINIDA':
         logging.error("A variável de ambiente 'API_KEY_GEMINI' não foi definida no Jenkins.")
         return
-    
     vulnerabilidades = analisar_json(JSON_INPUT_PATH)
     if not vulnerabilidades:
         logging.info("Nenhuma vulnerabilidade encontrada ou o arquivo JSON está vazio. Saindo.")
         return
-    
     dados_com_solucao = []
     for vuln in vulnerabilidades:
         if vuln['severidade'] in ['LOW', 'Desconhecida']:
-             logging.info(f"Pulando {vuln['cve']} (Severidade: {vuln['severidade']}).")
+             logging.info(f"Pulando {vuln['cve']} (Severidade: {vulV['severidade']}).")
              continue
-        
         descricao_pt, solucao = obter_dados_ia(
             vuln['cve'], 
             vuln['dependencia'], 
