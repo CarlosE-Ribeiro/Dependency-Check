@@ -147,7 +147,14 @@ pipeline {
             dependencyCheckPublisher pattern: 'target/dependency-check-report.xml'
 
             // Arquiva o relatório final gerado com IA
-            archiveArtifacts artifacts: 'relatorio_vulnerabilidades.html', allowEmptyArchive: true
+                    publishHTML(target: [
+                        allowMissing: true,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: '.', // Pasta onde o relatório está (raiz do workspace)
+                        reportFiles: 'relatorio_vulnerabilidades.html', // O nome do seu arquivo
+                        reportName: 'Relatório de Vulnerabilidades (IA)' // O nome que vai aparecer no link
+                    ])
         }
     }
 }
