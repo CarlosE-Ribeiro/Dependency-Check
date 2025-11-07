@@ -54,8 +54,7 @@ def obter_dados_ia(cve, dependencia, descricao_en):
     """
     logging.info(f"Consultando IA (via urllib) para dados da {cve}...")
 
-    # --- A GRANDE MUDANÇA ESTÁ AQUI ---
-    # Usando a API v1 (moderna) e o modelo gemini-1.5-flash
+    # --- CHAMANDO A API v1 (MODERNA) ---
     url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
     
     prompt_texto = f"""
@@ -76,7 +75,6 @@ def obter_dados_ia(cve, dependencia, descricao_en):
     }}
     """
     
-    # O payload da API 'v1' é um pouco diferente
     payload = {
         "contents": [
             {
@@ -93,8 +91,6 @@ def obter_dados_ia(cve, dependencia, descricao_en):
     raw_response_text = ""
     try:
         req = urllib.request.Request(url, data=data, headers=headers, method='POST')
-        
-        # Adiciona um contexto SSL (boa prática)
         context = ssl.create_default_context()
         
         with urllib.request.urlopen(req, context=context) as response:
@@ -102,10 +98,8 @@ def obter_dados_ia(cve, dependencia, descricao_en):
             raw_response_text = response_body
             response_json = json.loads(response_body)
             
-            # Navega na resposta JSON
             solucao_bruta = response_json['candidates'][0]['content']['parts'][0]['text']
             
-            # A IA ainda pode ser "tagarela", então usamos regex
             match = re.search(r"\{.*\}", solucao_bruta, re.DOTALL)
             if not match:
                 raise ValueError("Nenhum JSON válido encontrado na resposta da IA")
@@ -124,7 +118,7 @@ def obter_dados_ia(cve, dependencia, descricao_en):
         return fallback_desc, fallback_sol
 
 def gerar_relatorio_html(dados_finais, output_path):
-    # ... (Esta função continua EXATAMENTE igual, com o CSS e a tabela) ...
+    """Cria o arquivo HTML com o CSS embutido."""
     logging.info(f"Gerando relatório HTML em: {output_path}")
     html_style = """
     <style>
@@ -195,11 +189,9 @@ def gerar_relatorio_html(dados_finais, output_path):
         logging.error(f"Falha ao salvar o arquivo HTML. Erro: {e}")
 
 def main():
-    # ... (Esta função continua EXATAMENTE igual) ...
     if API_KEY == 'ERRO_KEY_NAO_DEFINIDA':
         logging.error("A variável de ambiente 'API_KEY_GEMINI' não foi definida no Jenkins.")
         return
-    # Note que não configuramos mais a IA aqui
     
     vulnerabilidades = analisar_json(JSON_INPUT_PATH)
     if not vulnerabilidades:
@@ -212,7 +204,6 @@ def main():
              logging.info(f"Pulando {vuln['cve']} (Severidade: {vuln['severidade']}).")
              continue
         
-        # A chamada da função mudou, não passamos mais o "modelo"
         descricao_pt, solucao = obter_dados_ia(
             vuln['cve'], 
             vuln['dependencia'], 
