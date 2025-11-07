@@ -53,7 +53,8 @@ def obter_dados_ia(cve, dependencia, descricao_en):
     logging.info(f"Consultando IA (via urllib) para dados da {cve}...")
 
     # A URL que DEVERIA estar sendo usada
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+    # --- CHAMANDO A API v1 ESTÁVEL com o MODELO ESTÁVEL ---
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={API_KEY}"
     
     # --- O "DEDO-DURO" ESTÁ AQUI ---
     # Esta linha vai nos dizer qual versão do script está rodando
