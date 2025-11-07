@@ -54,8 +54,8 @@ def obter_dados_ia(cve, dependencia, descricao_en):
     """
     logging.info(f"Consultando IA (via urllib) para dados da {cve}...")
 
-    # --- CHAMANDO A API v1 (MODERNA) ---
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+    # --- CHAMANDO A API v1beta (CORRETA) ---
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
     
     prompt_texto = f"""
     Você é um assistente de cibersegurança.
