@@ -6,14 +6,25 @@ import re
 import ssl
 from pathlib import Path
 
-# ... (Configuração igual) ...
+# ------------ Config -------------
 API_KEY = os.environ.get('API_KEY_GEMINI', 'ERRO_KEY_NAO_DEFINIDA')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-1.5-flash')  # pode trocar por gemini-1.5-pro
 JSON_INPUT_PATH = "target/dependency-check-report.json"
 HTML_OUTPUT_PATH = "relatorio_vulnerabilidades.html"
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Opcional: garantir UTF-8 no Windows/Jenkins
+try:
+    import sys
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+except Exception:
+    pass
+# ---------------------------------
+
 def analisar_json(filepath):
-    # ... (Esta função está 100% correta, não mexe) ...
     logging.info(f"Analisando o arquivo JSON em: {filepath}")
     vulnerabilidades_encontradas = []
     try:
@@ -46,70 +57,101 @@ def analisar_json(filepath):
         logging.error(f"ERRO: Falha ao decodificar o JSON. O arquivo está corrompido?")
         return []
 
+def _first_json_block(texto: str) -> str | None:
+    """Extrai o primeiro bloco { ... } bem-formado da string."""
+    stack = 0
+    start = -1
+    for i, ch in enumerate(texto):
+        if ch == '{':
+            if stack == 0:
+                start = i
+            stack += 1
+        elif ch == '}':
+            if stack > 0:
+                stack -= 1
+                if stack == 0 and start != -1:
+                    return texto[start:i+1]
+    return None
+
 def obter_dados_ia(cve, dependencia, descricao_en):
     """
-    Pergunta ao Gemini a SOLUÇÃO e a TRADUÇÃO usando urllib.
+    Pergunta ao Gemini a SOLUÇÃO e a TRADUÇÃO usando urllib (API v1beta).
     """
     logging.info(f"Consultando IA (via urllib) para dados da {cve}...")
 
-    # A URL que DEVERIA estar sendo usada
-    # --- CHAMANDO A API v1 ESTÁVEL com o MODELO ESTÁVEL ---
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={API_KEY}"
-    
-    # --- O "DEDO-DURO" ESTÁ AQUI ---
-    # Esta linha vai nos dizer qual versão do script está rodando
+    # Endpoint correto (v1beta) + modelo configurável
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={API_KEY}"
+
     logging.info(f"VERIFICAÇÃO DE URL: Estou chamando: {url}")
-    # ---------------------------------
 
-    prompt_texto = f"""
-    Você é um assistente de cibersegurança.
-    Analise a vulnerabilidade:
-    - CVE: {cve}
-    - Dependência: {dependencia}
-    - Descrição (Inglês): "{descricao_en}"
+    prompt_texto = (
+        "Você é um assistente de cibersegurança.\n"
+        "Analise a vulnerabilidade e responda APENAS um objeto JSON com as chaves \"descricao_pt\" e \"solucao\".\n"
+        "Não use Markdown, não escreva nada além do JSON.\n\n"
+        f"- CVE: {cve}\n"
+        f"- Dependência: {dependencia}\n"
+        f"- Descrição (Inglês): \"{descricao_en}\"\n\n"
+        "Exemplo de resposta:\n"
+        "{\n"
+        "  \"descricao_pt\": \"Resumo objetivo da falha em PT-BR\",\n"
+        "  \"solucao\": \"Ação concreta: atualizar para versão X, aplicar patch Y, mitigar com Z\"\n"
+        "}"
+    )
 
-    Sua resposta deve ser APENAS um objeto JSON.
-    NÃO use markdown (```json), NÃO adicione "Claro, aqui está:", apenas o JSON.
-    
-    O JSON deve conter as chaves "descricao_pt" e "solucao".
-    Exemplo:
-    {{
-      "descricao_pt": "Uma falha de desserialização...",
-      "solucao": "Atualize {dependencia} para a versão 5.0.0 ou superior."
-    }}
-    """
-    
-    payload = { "contents": [ { "parts": [ {"text": prompt_texto} ] } ] }
+    payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": prompt_texto}]
+            }
+        ]
+    }
     data = json.dumps(payload).encode('utf-8')
-    headers = {"Content-Type": "application/json"}
+    headers = {"Content-Type": "application/json; charset=utf-8"}
     raw_response_text = ""
 
     try:
         req = urllib.request.Request(url, data=data, headers=headers, method='POST')
         context = ssl.create_default_context()
-        with urllib.request.urlopen(req, context=context) as response:
-            # ... (resto do try...catch... igual ao anterior) ...
-            response_body = response.read().decode('utf-8')
+        with urllib.request.urlopen(req, context=context, timeout=30) as response:
+            response_body = response.read().decode('utf-8', errors='replace')
             raw_response_text = response_body
             response_json = json.loads(response_body)
-            solucao_bruta = response_json['candidates'][0]['content']['parts'][0]['text']
-            match = re.search(r"\{.*\}", solucao_bruta, re.DOTALL)
-            if not match:
+
+            # Caminho típico da resposta Gemini v1beta
+            txt = response_json["candidates"][0]["content"]["parts"][0]["text"]
+
+            # Extrai JSON da resposta textual do modelo
+            bloco = _first_json_block(txt)
+            if not bloco:
                 raise ValueError("Nenhum JSON válido encontrado na resposta da IA")
-            dados_ia = json.loads(match.group(0))
+
+            dados_ia = json.loads(bloco)
             return dados_ia.get('descricao_pt', 'IA falhou em gerar descrição.'), \
                    dados_ia.get('solucao', 'IA falhou em gerar solução.')
+
+    except urllib.error.HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode('utf-8', errors='replace')
+        except Exception:
+            pass
+        logging.error(f"===== FALHA AO PROCESSAR IA (urllib) para {cve} =====")
+        logging.error(f"HTTP {e.code} {e.reason}")
+        logging.error(f"Resposta BRUTA da API: {body or raw_response_text}")
+        logging.error("==========================================")
     except Exception as e:
         logging.error(f"===== FALHA AO PROCESSAR IA (urllib) para {cve} =====")
         logging.error(f"Erro: {e}")
         logging.error(f"Resposta BRUTA da API: {raw_response_text}")
         logging.error("==========================================")
-        fallback_desc = f"(Tradução falou) {descricao_en}" # Mudei para "falou" para sabermos se o script novo rodou
-        fallback_sol = "Falha ao consultar a IA para uma solução."
-        return fallback_desc, fallback_sol
+
+    # Fallback (mantive seu 'falou' para você distinguir versões)
+    fallback_desc = f"(Tradução falou) {descricao_en}"
+    fallback_sol = "Falha ao consultar a IA para uma solução."
+    return fallback_desc, fallback_sol
 
 def gerar_relatorio_html(dados_finais, output_path):
-    # ... (Esta função está 100% correta, não mexe) ...
     logging.info(f"Gerando relatório HTML em: {output_path}")
     html_style = """
     <style>
@@ -129,13 +171,14 @@ def gerar_relatorio_html(dados_finais, output_path):
         .col-sol { width: 30%; }
         .severity-CRITICAL { color: #D73A49; font-weight: bold; }
         .severity-HIGH { color: #F56A00; font-weight: bold; }
-        .severity-MODERATE { color: #DBAB09; }
+        .severity-MEDIUM, .severity-MODERATE { color: #DBAB09; }
         .severity-LOW { color: #31704B; }
     </style>
     """
     table_rows = ""
     for item in dados_finais:
-        severidade_class = f"severity-{item['severidade'].upper()}"
+        sev_upper = (item['severidade'] or "").upper()
+        severidade_class = f"severity-{sev_upper}"
         table_rows += f"""
         <tr>
             <td class="col-cve">{item['cve']}</td>
@@ -180,7 +223,6 @@ def gerar_relatorio_html(dados_finais, output_path):
         logging.error(f"Falha ao salvar o arquivo HTML. Erro: {e}")
 
 def main():
-    # ... (Esta função está 100% correta, não mexe) ...
     if API_KEY == 'ERRO_KEY_NAO_DEFINIDA':
         logging.error("A variável de ambiente 'API_KEY_GEMINI' não foi definida no Jenkins.")
         return
@@ -190,12 +232,13 @@ def main():
         return
     dados_com_solucao = []
     for vuln in vulnerabilidades:
+        # pule leves/desconhecidas
         if vuln['severidade'] in ['LOW', 'Desconhecida']:
-             logging.info(f"Pulando {vuln['cve']} (Severidade: {vulV['severidade']}).")
-             continue
+            logging.info(f"Pulando {vuln['cve']} (Severidade: {vuln['severidade']}).")
+            continue
         descricao_pt, solucao = obter_dados_ia(
-            vuln['cve'], 
-            vuln['dependencia'], 
+            vuln['cve'],
+            vuln['dependencia'],
             vuln['descricao_en']
         )
         dados_com_solucao.append({
