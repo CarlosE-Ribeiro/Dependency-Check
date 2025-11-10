@@ -30,10 +30,6 @@ pipeline {
             defaultValue: '7.0',
             description: 'Falhar o build se uma CVE tiver score CVSS igual ou superior a este valor (0.0 a 10.0)'
         )
-
-        choice(name: 'GEMINI_MODEL',
-           choices: ['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest', 'gemini-1.5-flash-002', 'gemini-1.5-pro-002'],
-           description: 'Modelo Gemini para generateContent')
     }
 
     environment {
