@@ -1,37 +1,46 @@
 import json
 import os
 import logging
-import urllib.request  # <--- Usando a biblioteca nativa
+import urllib.request
 import re
 import ssl
 from pathlib import Path
 
-# --- CONFIGURAÇÃO ---
+# ... (Configuração igual) ...
+
 API_KEY = os.environ.get('API_KEY_GEMINI', 'ERRO_KEY_NAO_DEFINIDA')
 JSON_INPUT_PATH = "target/dependency-check-report.json"
 HTML_OUTPUT_PATH = "relatorio_vulnerabilidades.html"
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# --- FUNÇÕES ---
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
 
 def analisar_json(filepath):
-    """Lê o JSON do OWASP e extrai a lista de vulnerabilidades."""
+    # ... (Esta função está 100% correta, não mexe) ...
     logging.info(f"Analisando o arquivo JSON em: {filepath}")
     vulnerabilidades_encontradas = []
+
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
+
         if 'dependencies' not in data:
             return []
+
         for dep in data['dependencies']:
             if 'vulnerabilities' in dep and dep['vulnerabilities']:
                 dep_nome = dep.get('fileName', 'Dependência desconhecida')
+
                 for vuln in dep['vulnerabilities']:
                     score = "N/A"
                     if 'cvssv3' in vuln and vuln['cvssv3'].get('baseScore'):
                         score = vuln['cvssv3'].get('baseScore')
                     elif 'cvssv2' in vuln and vuln['cvssv2'].get('score'):
                         score = vuln['cvssv2'].get('score')
+
                     vulnerabilidades_encontradas.append({
                         "cve": vuln.get('name', 'N/A'),
                         "severidade": vuln.get('severity', 'Desconhecida'),
@@ -39,34 +48,38 @@ def analisar_json(filepath):
                         "dependencia": dep_nome,
                         "score": score
                     })
+
         logging.info(f"Extraídas {len(vulnerabilidades_encontradas)} vulnerabilidades do JSON.")
         return vulnerabilidades_encontradas
+
     except FileNotFoundError:
         logging.error(f"ERRO: Arquivo JSON não encontrado em {filepath}")
         return []
     except json.JSONDecodeError:
-        logging.error(f"ERRO: Falha ao decodificar o JSON. O arquivo está corrompido?")
+        logging.error("ERRO: Falha ao decodificar o JSON. O arquivo está corrompido?")
         return []
 
+
 def obter_dados_ia(cve, dependencia, descricao_en):
-    """
-    Pergunta ao Gemini a SOLUÇÃO e a TRADUÇÃO usando urllib.
-    """
+    """Pergunta ao Gemini a SOLUÇÃO e a TRADUÇÃO usando urllib."""
     logging.info(f"Consultando IA (via urllib) para dados da {cve}...")
 
-    # --- CHAMANDO A API v1 (MODERNA) ---
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
-    
+    # --- CHAMANDO A API v1 ESTÁVEL com o MODELO ESTÁVEL ---
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={API_KEY}"
+
+    # --- O "DEDO-DURO" ESTÁ AQUI ---
+    logging.info(f"VERIFICAÇÃO DE URL: Estou chamando: {url}")
+
+    # ---------------------------------
     prompt_texto = f"""
-    Você é um assistente de cibersegurança.
-    Analise a vulnerabilidade:
+    Você é um assistente de cibersegurança. Analise a vulnerabilidade:
     - CVE: {cve}
     - Dependência: {dependencia}
     - Descrição (Inglês): "{descricao_en}"
 
-    Sua resposta deve ser APENAS um objeto JSON.
-    NÃO use markdown (```json), NÃO adicione "Claro, aqui está:", apenas o JSON.
-    
+    Sua resposta deve ser APENAS um objeto JSON. NÃO use markdown (
+    json), NÃO adicione "Claro, aqui está:", apenas o JSON.
+
     O JSON deve conter as chaves "descricao_pt" e "solucao".
     Exemplo:
     {{
@@ -74,52 +87,47 @@ def obter_dados_ia(cve, dependencia, descricao_en):
       "solucao": "Atualize {dependencia} para a versão 5.0.0 ou superior."
     }}
     """
-    
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": prompt_texto}
-                ]
-            }
-        ]
-    }
-    
+
+    payload = {"contents": [{"parts": [{"text": prompt_texto}]}]}
     data = json.dumps(payload).encode('utf-8')
     headers = {"Content-Type": "application/json"}
-
     raw_response_text = ""
+
     try:
         req = urllib.request.Request(url, data=data, headers=headers, method='POST')
         context = ssl.create_default_context()
-        
+
         with urllib.request.urlopen(req, context=context) as response:
             response_body = response.read().decode('utf-8')
             raw_response_text = response_body
             response_json = json.loads(response_body)
-            
+
             solucao_bruta = response_json['candidates'][0]['content']['parts'][0]['text']
-            
             match = re.search(r"\{.*\}", solucao_bruta, re.DOTALL)
             if not match:
                 raise ValueError("Nenhum JSON válido encontrado na resposta da IA")
 
             dados_ia = json.loads(match.group(0))
-            return dados_ia.get('descricao_pt', 'IA falhou em gerar descrição.'), \
-                   dados_ia.get('solucao', 'IA falhou em gerar solução.')
+            return (
+                dados_ia.get('descricao_pt', 'IA falhou em gerar descrição.'),
+                dados_ia.get('solucao', 'IA falhou em gerar solução.')
+            )
 
     except Exception as e:
         logging.error(f"===== FALHA AO PROCESSAR IA (urllib) para {cve} =====")
         logging.error(f"Erro: {e}")
         logging.error(f"Resposta BRUTA da API: {raw_response_text}")
         logging.error("==========================================")
-        fallback_desc = f"(Tradução falhou) {descricao_en}"
+
+        fallback_desc = f"(Tradução falou) {descricao_en}"  # Marcador de versão
         fallback_sol = "Falha ao consultar a IA para uma solução."
         return fallback_desc, fallback_sol
 
+
 def gerar_relatorio_html(dados_finais, output_path):
-    """Cria o arquivo HTML com o CSS embutido."""
+    # ... (Esta função está 100% correta, não mexe) ...
     logging.info(f"Gerando relatório HTML em: {output_path}")
+
     html_style = """
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background-color: #f9f9f9; color: #333; }
@@ -142,6 +150,7 @@ def gerar_relatorio_html(dados_finais, output_path):
         .severity-LOW { color: #31704B; }
     </style>
     """
+
     table_rows = ""
     for item in dados_finais:
         severidade_class = f"severity-{item['severidade'].upper()}"
@@ -154,6 +163,7 @@ def gerar_relatorio_html(dados_finais, output_path):
             <td class="col-sol">{item['solucao']}</td>
         </tr>
         """
+
     html_content = f"""
     <html>
     <head>
@@ -181,6 +191,7 @@ def gerar_relatorio_html(dados_finais, output_path):
     </body>
     </html>
     """
+
     try:
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
@@ -188,27 +199,30 @@ def gerar_relatorio_html(dados_finais, output_path):
     except Exception as e:
         logging.error(f"Falha ao salvar o arquivo HTML. Erro: {e}")
 
+
 def main():
+    # ... (Esta função está 100% correta, não mexe) ...
     if API_KEY == 'ERRO_KEY_NAO_DEFINIDA':
         logging.error("A variável de ambiente 'API_KEY_GEMINI' não foi definida no Jenkins.")
         return
-    
+
     vulnerabilidades = analisar_json(JSON_INPUT_PATH)
     if not vulnerabilidades:
         logging.info("Nenhuma vulnerabilidade encontrada ou o arquivo JSON está vazio. Saindo.")
         return
-    
+
     dados_com_solucao = []
     for vuln in vulnerabilidades:
         if vuln['severidade'] in ['LOW', 'Desconhecida']:
-             logging.info(f"Pulando {vuln['cve']} (Severidade: {vuln['severidade']}).")
-             continue
-        
+            logging.info(f"Pulando {vuln['cve']} (Severidade: {vuln['severidade']}).")
+            continue
+
         descricao_pt, solucao = obter_dados_ia(
-            vuln['cve'], 
-            vuln['dependencia'], 
+            vuln['cve'],
+            vuln['dependencia'],
             vuln['descricao_en']
         )
+
         dados_com_solucao.append({
             "cve": vuln['cve'],
             "severidade": vuln['severidade'],
@@ -216,10 +230,13 @@ def main():
             "descricao_pt": descricao_pt,
             "solucao": solucao
         })
+
     if not dados_com_solucao:
         logging.info("Nenhuma vulnerabilidade (Moderada ou superior) encontrada para gerar relatório.")
         return
+
     gerar_relatorio_html(dados_com_solucao, HTML_OUTPUT_PATH)
+
 
 if __name__ == "__main__":
     main()
