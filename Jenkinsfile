@@ -32,13 +32,6 @@ pipeline {
         )
     }
 
-    environment {
-        // Garante acentuação correta no Windows/Jenkins
-        PYTHONIOENCODING = 'UTF-8'
-        // Caminho do Python (ajuste se necessário)
-        PYTHON_EXE = 'C:/Users/Carlos Eduardo/AppData/Local/Programs/Python/Python313/python.exe'
-    }
-
     // ============================
     //  DEFINIÇÃO DAS ETAPAS
     // ============================
