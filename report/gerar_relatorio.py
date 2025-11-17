@@ -9,8 +9,12 @@ from pathlib import Path
 # ... (Configuração igual) ...
 
 API_KEY = os.environ.get('API_KEY_GEMINI', 'ERRO_KEY_NAO_DEFINIDA')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-1.5-flash-latest')
+
 JSON_INPUT_PATH = os.environ.get('JSON_INPUT_PATH', 'target/dependency-check-report.json')
 HTML_OUTPUT_PATH = os.environ.get('HTML_OUTPUT_PATH', 'relatorio_vulnerabilidades.html')
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 logging.basicConfig(
     level=logging.INFO,
@@ -67,7 +71,6 @@ def obter_dados_ia(cve, dependencia, descricao_en):
     """
     logging.info(f"Consultando IA (via urllib) para dados da {cve}...")
 
-    # Endpoint CORRETO (v1beta) e modelo configurável
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={API_KEY}"
     logging.info(f"VERIFICAÇÃO DE URL: Estou chamando: {url}")
 
@@ -110,10 +113,8 @@ Exemplo:
             raw_response_text = response_body
             response_json = json.loads(response_body)
 
-            # Caminho típico do Gemini v1beta
             solucao_bruta = response_json["candidates"][0]["content"]["parts"][0]["text"]
 
-            # Extrai o primeiro bloco { ... } da resposta
             match = re.search(r"\{.*\}", solucao_bruta, re.DOTALL)
             if not match:
                 raise ValueError("Nenhum JSON válido encontrado na resposta da IA")
@@ -121,7 +122,6 @@ Exemplo:
             dados_ia = json.loads(match.group(0))
             return dados_ia.get('descricao_pt', 'IA falhou em gerar descrição.'), \
                    dados_ia.get('solucao', 'IA falhou em gerar solução.')
-
     except Exception as e:
         logging.error(f"===== FALHA AO PROCESSAR IA (urllib) para {cve} =====")
         logging.error(f"Erro: {e}")
@@ -131,6 +131,7 @@ Exemplo:
         fallback_desc = f"(Tradução falou) {descricao_en}"
         fallback_sol = "Falha ao consultar a IA para uma solução."
         return fallback_desc, fallback_sol
+
 
 
 def gerar_relatorio_html(dados_finais, output_path):
