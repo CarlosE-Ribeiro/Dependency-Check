@@ -61,57 +61,66 @@ def analisar_json(filepath):
 
 
 def obter_dados_ia(cve, dependencia, descricao_en):
-    """Pergunta ao Gemini a SOLUÇÃO e a TRADUÇÃO usando urllib."""
+    """
+    Pergunta ao Gemini a SOLUÇÃO e a TRADUÇÃO usando urllib.
+    Usa a API v1beta e o modelo definido em GEMINI_MODEL.
+    """
     logging.info(f"Consultando IA (via urllib) para dados da {cve}...")
 
-    # --- CHAMANDO A API v1 ESTÁVEL com o MODELO ESTÁVEL ---
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={API_KEY}"
-
-    # --- O "DEDO-DURO" ESTÁ AQUI ---
+    # Endpoint CORRETO (v1beta) e modelo configurável
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={API_KEY}"
     logging.info(f"VERIFICAÇÃO DE URL: Estou chamando: {url}")
 
-    # ---------------------------------
     prompt_texto = f"""
-    Você é um assistente de cibersegurança. Analise a vulnerabilidade:
-    - CVE: {cve}
-    - Dependência: {dependencia}
-    - Descrição (Inglês): "{descricao_en}"
+Você é um assistente de cibersegurança.
+Analise a vulnerabilidade:
+- CVE: {cve}
+- Dependência: {dependencia}
+- Descrição (Inglês): "{descricao_en}"
 
-    Sua resposta deve ser APENAS um objeto JSON. NÃO use markdown (
-    json), NÃO adicione "Claro, aqui está:", apenas o JSON.
+Sua resposta deve ser APENAS um objeto JSON.
+NÃO use markdown (```json), NÃO adicione texto extra, apenas o JSON.
 
-    O JSON deve conter as chaves "descricao_pt" e "solucao".
-    Exemplo:
-    {{
-      "descricao_pt": "Uma falha de desserialização...",
-      "solucao": "Atualize {dependencia} para a versão 5.0.0 ou superior."
-    }}
-    """
+O JSON deve conter as chaves "descricao_pt" e "solucao".
+Exemplo:
+{{
+  "descricao_pt": "Uma falha de desserialização...",
+  "solucao": "Atualize {dependencia} para a versão 5.0.0 ou superior."
+}}
+"""
 
-    payload = {"contents": [{"parts": [{"text": prompt_texto}]}]}
+    payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": prompt_texto}]
+            }
+        ]
+    }
+
     data = json.dumps(payload).encode('utf-8')
-    headers = {"Content-Type": "application/json"}
+    headers = {"Content-Type": "application/json; charset=utf-8"}
     raw_response_text = ""
 
     try:
         req = urllib.request.Request(url, data=data, headers=headers, method='POST')
         context = ssl.create_default_context()
-
-        with urllib.request.urlopen(req, context=context) as response:
-            response_body = response.read().decode('utf-8')
+        with urllib.request.urlopen(req, context=context, timeout=30) as response:
+            response_body = response.read().decode('utf-8', errors='replace')
             raw_response_text = response_body
             response_json = json.loads(response_body)
 
-            solucao_bruta = response_json['candidates'][0]['content']['parts'][0]['text']
+            # Caminho típico do Gemini v1beta
+            solucao_bruta = response_json["candidates"][0]["content"]["parts"][0]["text"]
+
+            # Extrai o primeiro bloco { ... } da resposta
             match = re.search(r"\{.*\}", solucao_bruta, re.DOTALL)
             if not match:
                 raise ValueError("Nenhum JSON válido encontrado na resposta da IA")
 
             dados_ia = json.loads(match.group(0))
-            return (
-                dados_ia.get('descricao_pt', 'IA falhou em gerar descrição.'),
-                dados_ia.get('solucao', 'IA falhou em gerar solução.')
-            )
+            return dados_ia.get('descricao_pt', 'IA falhou em gerar descrição.'), \
+                   dados_ia.get('solucao', 'IA falhou em gerar solução.')
 
     except Exception as e:
         logging.error(f"===== FALHA AO PROCESSAR IA (urllib) para {cve} =====")
@@ -119,7 +128,7 @@ def obter_dados_ia(cve, dependencia, descricao_en):
         logging.error(f"Resposta BRUTA da API: {raw_response_text}")
         logging.error("==========================================")
 
-        fallback_desc = f"(Tradução falou) {descricao_en}"  # Marcador de versão
+        fallback_desc = f"(Tradução falou) {descricao_en}"
         fallback_sol = "Falha ao consultar a IA para uma solução."
         return fallback_desc, fallback_sol
 
