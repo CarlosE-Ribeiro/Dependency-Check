@@ -129,31 +129,27 @@ pipeline {
             }
         }
 
-        stage('Gerar relatório (venv + Gemini)') {
+        stage('Gerar relatório (Gemini via Python local)') {
   steps {
     withCredentials([string(credentialsId: 'gemini-api-key', variable: 'API_KEY_GEMINI')]) {
       bat '''
-        REM Vai para a pasta REAL do projeto onde está o venv
+        REM Vai para a pasta REAL do projeto
         cd /d "C:\\Users\\Carlos Eduardo\\Desktop\\Programacao\\Dependency-Check"
-
-        REM Ativa o venv
-        call report\\env\\Scripts\\activate.bat
 
         REM Ajusta encoding
         set PYTHONIOENCODING=UTF-8
 
-        REM Seta chave do Gemini para o Python
+        REM Seta chave do Gemini e modelo
         set API_KEY_GEMINI=%API_KEY_GEMINI%
-
-        REM Seta modelo
         set GEMINI_MODEL=gemini-1.5-flash-latest
 
-        REM Executa seu script
-        python report\\gerar_relatorio.py
+        REM Executa seu script com o Python instalado no usuário
+        "C:\\Users\\Carlos Eduardo\\AppData\\Local\\Programs\\Python\\Python313\\python.exe" report\\gerar_relatorio.py
       '''
     }
   }
 }
+
 
 
 
