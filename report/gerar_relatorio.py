@@ -71,7 +71,7 @@ def obter_dados_ia(cve, dependencia, descricao_en):
     """
     logging.info(f"Consultando IA (via urllib) para dados da {cve}...")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1/models/{GEMINI_MODEL}:generateContent?key={API_KEY}"
     logging.info(f"VERIFICAÇÃO DE URL: Estou chamando: {url}")
 
     prompt_texto = f"""
