@@ -137,7 +137,7 @@ pipeline {
         cd /d "C:\\Users\\Carlos Eduardo\\Desktop\\Programacao\\Dependency-Check"
 
         REM Ativa o venv
-        call venv\\Scripts\\activate.bat
+        call env\\Scripts\\activate.bat
 
         REM Ajusta encoding
         set PYTHONIOENCODING=UTF-8
