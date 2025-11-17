@@ -143,12 +143,19 @@ pipeline {
         set API_KEY_GEMINI=%API_KEY_GEMINI%
         set GEMINI_MODEL=gemini-1.5-flash-latest
 
+        REM Diz pro script onde está o JSON gerado pelo Maven (no workspace do Jenkins)
+        set JSON_INPUT_PATH=%WORKSPACE%\\target\\dependency-check-report.json
+
+        REM Opcional: salvar o HTML também no workspace do Jenkins
+        set HTML_OUTPUT_PATH=%WORKSPACE%\\relatorio_vulnerabilidades.html
+
         REM Executa seu script com o Python instalado no usuário
         "C:\\Users\\Carlos Eduardo\\AppData\\Local\\Programs\\Python\\Python313\\python.exe" report\\gerar_relatorio.py
       '''
     }
   }
 }
+
 
 
 

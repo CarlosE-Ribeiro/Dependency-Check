@@ -9,8 +9,8 @@ from pathlib import Path
 # ... (Configuração igual) ...
 
 API_KEY = os.environ.get('API_KEY_GEMINI', 'ERRO_KEY_NAO_DEFINIDA')
-JSON_INPUT_PATH = "target/dependency-check-report.json"
-HTML_OUTPUT_PATH = "relatorio_vulnerabilidades.html"
+JSON_INPUT_PATH = os.environ.get('JSON_INPUT_PATH', 'target/dependency-check-report.json')
+HTML_OUTPUT_PATH = os.environ.get('HTML_OUTPUT_PATH', 'relatorio_vulnerabilidades.html')
 
 logging.basicConfig(
     level=logging.INFO,
