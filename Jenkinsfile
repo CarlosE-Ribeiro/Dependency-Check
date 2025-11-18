@@ -105,29 +105,17 @@ pipeline {
         }
 
         // ------------------------------------------
-        // Etapa 4: Geração de relatório com IA
+        // Etapa 4: Baixando JSON
         // ------------------------------------------
-        stage('Gerar Relatório com IA') {
-            when {
-                expression { return params.EXECUTAR_VERIFICACAO_SEGURANCA }
-            }
+        stage('Copiar JSON para máquina local') {
             steps {
-                withCredentials([string(credentialsId: 'gemini-api-key', variable: 'API_KEY_GEMINI')]) {
-      bat '''
-        cd /d "C:\\Users\\Carlos Eduardo\\Desktop\\Programacao\\Dependency-Check"
-        echo Executando script Python para gerar relatório HTML com IA...
-
-        set PYTHONIOENCODING=UTF-8
-
-        set API_KEY_GEMINI=%API_KEY_GEMINI%
-        set GEMINI_MODEL=gemini-2.5-flash
-        set JSON_INPUT_PATH=C:\\ProgramData\\Jenkins\\.jenkins\\workspace\\Verificando Dependencias\\target\\dependency-check-report.json
-        set HTML_OUTPUT_PATH=C:\\ProgramData\\Jenkins\\.jenkins\\workspace\\Verificando Dependencias\\relatorio_vulnerabilidades.html
-
-        "C:\\Users\\Carlos Eduardo\\AppData\\Local\\Programs\\Python\\Python313\\python.exe" report\\gerar_relatorio.py'''
-                }
+                bat """
+                    echo Copiando JSON gerado para sua pasta local...
+                    copy /Y "%WORKSPACE%\\target\\dependency-check-report.json" "C:\\Users\\Carlos Eduardo\\Desktop\\Programacao\\Dependency-Check\\report\\dependency-check-report.json"
+                """
             }
         }
+
 
 
 
