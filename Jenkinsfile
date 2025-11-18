@@ -112,6 +112,8 @@ pipeline {
                 bat """
                     echo Copiando JSON gerado para sua pasta local...
                     copy /Y "%WORKSPACE%\\target\\dependency-check-report.json" "C:\\Users\\Carlos Eduardo\\Desktop\\Programacao\\Dependency-Check\\report\\dependency-check-report.json"
+                    python gerar_relatorio.py "C:\Users\Carlos Eduardo\Desktop\Programacao\Dependency-Check\report\dependency-check-report.json"
+
                 """
             }
         }
