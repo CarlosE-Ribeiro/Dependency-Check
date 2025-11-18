@@ -113,22 +113,18 @@ pipeline {
             }
             steps {
                 withCredentials([string(credentialsId: 'gemini-api-key', variable: 'API_KEY_GEMINI')]) {
-                bat '''
-                    cd /d "C:\\Users\\Carlos Eduardo\\Desktop\\Programacao\\Dependency-Check"
-                    echo Executando script Python para gerar relatório HTML com IA...
+      bat '''
+        cd /d "C:\\Users\\Carlos Eduardo\\Desktop\\Programacao\\Dependency-Check"
+        echo Executando script Python para gerar relatório HTML com IA...
 
-                    REM Ajusta encoding
-                    set PYTHONIOENCODING=UTF-8
+        set PYTHONIOENCODING=UTF-8
 
-                    REM Variáveis usadas pelo gerar_relatorio.py
-                    set API_KEY_GEMINI=%API_KEY_GEMINI%
-                    set GEMINI_MODEL=gemini-2.5-flash
-                    set JSON_INPUT_PATH=%WORKSPACE%\\target\\dependency-check-report.json
-                    set HTML_OUTPUT_PATH=%WORKSPACE%\\relatorio_vulnerabilidades.html
+        set API_KEY_GEMINI=%API_KEY_GEMINI%
+        set GEMINI_MODEL=gemini-2.5-flash
+        set JSON_INPUT_PATH=C:\\ProgramData\\Jenkins\\.jenkins\\workspace\\Verificando Dependencias\\target\\dependency-check-report.json
+        set HTML_OUTPUT_PATH=C:\\ProgramData\\Jenkins\\.jenkins\\workspace\\Verificando Dependencias\\relatorio_vulnerabilidades.html
 
-                    REM Executa o script Python no workspace
-                    "C:\\Users\\Carlos Eduardo\\AppData\\Local\\Programs\\Python\\Python313\\python.exe" report\\gerar_relatorio.py
-                '''
+        "C:\\Users\\Carlos Eduardo\\AppData\\Local\\Programs\\Python\\Python313\\python.exe" report\\gerar_relatorio.py'''
                 }
             }
         }
