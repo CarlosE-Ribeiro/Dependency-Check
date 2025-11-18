@@ -1,17 +1,15 @@
-import time
-import urllib.error
 import json
 import os
 import logging
 import urllib.request
+import urllib.error
 import re
 import ssl
+import time
 from pathlib import Path
 
-# ... (Configuração igual) ...
-
 API_KEY = os.environ.get('API_KEY_GEMINI', 'ERRO_KEY_NAO_DEFINIDA')
-GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-1.5-flash-latest')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
 
 JSON_INPUT_PATH = os.environ.get('JSON_INPUT_PATH', 'target/dependency-check-report.json')
 HTML_OUTPUT_PATH = os.environ.get('HTML_OUTPUT_PATH', 'relatorio_vulnerabilidades.html')
@@ -67,12 +65,39 @@ def analisar_json(filepath):
 
 
 def obter_dados_ia(cve, dependencia, descricao_en):
+    """
+    Consulta o Gemini em modo JSON para obter:
+      - descricao_pt
+      - solucao
+
+    Usa v1beta + responseMimeType=application/json para evitar texto solto.
+    """
     logging.info(f"Consultando IA (via urllib) para dados da {cve}...")
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
     logging.info(f"VERIFICAÇÃO DE URL: Estou chamando: {url}")
 
-    prompt_texto = f""" ... (seu prompt aqui) ... """
+    prompt_texto = f"""
+Você é um assistente de cibersegurança.
+Analise a vulnerabilidade:
+
+- CVE: {cve}
+- Dependência afetada: {dependencia}
+- Descrição original em inglês: "{descricao_en}"
+
+Gere uma resposta em PORTUGUÊS contendo:
+
+1) "descricao_pt": um resumo técnico claro da vulnerabilidade em português, em até 4 frases.
+2) "solucao": orientações objetivas de mitigação/correção (por exemplo: atualizar versão, aplicar patch, alterar configuração, mitigar com WAF etc.).
+
+A resposta DEVE ser estritamente um JSON VÁLIDO, sem comentários, sem markdown, sem texto extra.
+Exemplo de formato:
+
+{{
+  "descricao_pt": "Resumo da falha em português...",
+  "solucao": "Passos claros de mitigação/correção..."
+}}
+"""
 
     payload = {
         "contents": [
@@ -80,7 +105,17 @@ def obter_dados_ia(cve, dependencia, descricao_en):
                 "role": "user",
                 "parts": [{"text": prompt_texto}]
             }
-        ]
+        ],
+        # Força saída em JSON:
+        "responseMimeType": "application/json",
+        "responseSchema": {
+            "type": "OBJECT",
+            "properties": {
+                "descricao_pt": {"type": "STRING"},
+                "solucao": {"type": "STRING"}
+            },
+            "required": ["descricao_pt", "solucao"]
+        },
     }
 
     data = json.dumps(payload).encode("utf-8")
@@ -100,15 +135,15 @@ def obter_dados_ia(cve, dependencia, descricao_en):
                 raw_response_text = response_body
                 response_json = json.loads(response_body)
 
-                solucao_bruta = response_json["candidates"][0]["content"]["parts"][0]["text"]
+                # Em JSON mode, o modelo devolve JSON puro em parts[0].text
+                texto_json = response_json["candidates"][0]["content"]["parts"][0]["text"]
 
-                match = re.search(r"\{.*\}", solucao_bruta, re.DOTALL)
-                if not match:
-                    raise ValueError("Nenhum JSON válido encontrado na resposta da IA")
+                dados_ia = json.loads(texto_json)
 
-                dados_ia = json.loads(match.group(0))
-                return dados_ia.get("descricao_pt", "IA falhou em gerar descrição."), \
-                       dados_ia.get("solucao", "IA falhou em gerar solução.")
+                return (
+                    dados_ia.get("descricao_pt", "IA falhou em gerar descrição."),
+                    dados_ia.get("solucao", "IA falhou em gerar solução."),
+                )
 
         except urllib.error.HTTPError as e:
             body = ""
@@ -123,7 +158,6 @@ def obter_dados_ia(cve, dependencia, descricao_en):
             logging.error("==========================================")
 
             if e.code == 503 and tentativa < 2:
-                # espera crescente: 2s, 4s, 6s...
                 espera = 2 * (tentativa + 1)
                 logging.info(f"Modelo sobrecarregado (503). Aguardando {espera}s e tentando novamente...")
                 time.sleep(espera)
@@ -138,12 +172,10 @@ def obter_dados_ia(cve, dependencia, descricao_en):
             logging.error("==========================================")
             break
 
-    # Se chegou aqui, todas as tentativas falharam
+    # Se chegou aqui, falhou em todas as tentativas
     fallback_desc = f"(Tradução falou) {descricao_en}"
     fallback_sol = "Falha ao consultar a IA para uma solução."
     return fallback_desc, fallback_sol
-
-
 
 
 def gerar_relatorio_html(dados_finais, output_path):
