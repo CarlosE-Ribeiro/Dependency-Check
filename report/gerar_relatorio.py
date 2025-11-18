@@ -1,3 +1,5 @@
+import time
+import urllib.error
 import json
 import os
 import logging
@@ -67,28 +69,10 @@ def analisar_json(filepath):
 def obter_dados_ia(cve, dependencia, descricao_en):
     logging.info(f"Consultando IA (via urllib) para dados da {cve}...")
 
-    # Endpoint atualizado (v1beta) com modelo configurável
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
-
     logging.info(f"VERIFICAÇÃO DE URL: Estou chamando: {url}")
 
-    prompt_texto = f"""
-Você é um assistente de cibersegurança.
-Analise a vulnerabilidade:
-- CVE: {cve}
-- Dependência: {dependencia}
-- Descrição (Inglês): "{descricao_en}"
-
-Sua resposta deve ser APENAS um objeto JSON.
-NÃO use markdown (```json), NÃO adicione texto extra, apenas o JSON.
-
-O JSON deve conter as chaves "descricao_pt" e "solucao".
-Exemplo:
-{{
-  "descricao_pt": "Uma falha de desserialização...",
-  "solucao": "Atualize {dependencia} para a versão 5.0.0 ou superior."
-}}
-"""
+    prompt_texto = f""" ... (seu prompt aqui) ... """
 
     payload = {
         "contents": [
@@ -102,52 +86,62 @@ Exemplo:
     data = json.dumps(payload).encode("utf-8")
     headers = {
         "Content-Type": "application/json; charset=utf-8",
-        # Autenticação recomendada hoje: header, não query param
         "x-goog-api-key": API_KEY,
     }
 
     raw_response_text = ""
 
-    try:
-        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-        context = ssl.create_default_context()
-        with urllib.request.urlopen(req, context=context, timeout=30) as response:
-            response_body = response.read().decode("utf-8", errors="replace")
-            raw_response_text = response_body
-            response_json = json.loads(response_body)
-
-            solucao_bruta = response_json["candidates"][0]["content"]["parts"][0]["text"]
-
-            match = re.search(r"\{.*\}", solucao_bruta, re.DOTALL)
-            if not match:
-                raise ValueError("Nenhum JSON válido encontrado na resposta da IA")
-
-            dados_ia = json.loads(match.group(0))
-            return dados_ia.get("descricao_pt", "IA falhou em gerar descrição."), \
-                   dados_ia.get("solucao", "IA falhou em gerar solução.")
-
-    except urllib.error.HTTPError as e:
-        body = ""
+    for tentativa in range(3):
         try:
-            body = e.read().decode("utf-8", errors="replace")
-        except Exception:
-            pass
-        logging.error(f"===== FALHA AO PROCESSAR IA (urllib) para {cve} =====")
-        logging.error(f"HTTP {e.code} {e.reason}")
-        logging.error(f"Resposta BRUTA da API: {body}")
-        logging.error("==========================================")
-        fallback_desc = f"(Tradução falou) {descricao_en}"
-        fallback_sol = "Falha ao consultar a IA para uma solução."
-        return fallback_desc, fallback_sol
+            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+            context = ssl.create_default_context()
+            with urllib.request.urlopen(req, context=context, timeout=30) as response:
+                response_body = response.read().decode("utf-8", errors="replace")
+                raw_response_text = response_body
+                response_json = json.loads(response_body)
 
-    except Exception as e:
-        logging.error(f"===== FALHA AO PROCESSAR IA (urllib) para {cve} =====")
-        logging.error(f"Erro: {e}")
-        logging.error(f"Resposta BRUTA da API: {raw_response_text}")
-        logging.error("==========================================")
-        fallback_desc = f"(Tradução falou) {descricao_en}"
-        fallback_sol = "Falha ao consultar a IA para uma solução."
-        return fallback_desc, fallback_sol
+                solucao_bruta = response_json["candidates"][0]["content"]["parts"][0]["text"]
+
+                match = re.search(r"\{.*\}", solucao_bruta, re.DOTALL)
+                if not match:
+                    raise ValueError("Nenhum JSON válido encontrado na resposta da IA")
+
+                dados_ia = json.loads(match.group(0))
+                return dados_ia.get("descricao_pt", "IA falhou em gerar descrição."), \
+                       dados_ia.get("solucao", "IA falhou em gerar solução.")
+
+        except urllib.error.HTTPError as e:
+            body = ""
+            try:
+                body = e.read().decode("utf-8", errors="replace")
+            except Exception:
+                pass
+
+            logging.error(f"===== FALHA AO PROCESSAR IA (urllib) para {cve} (tentativa {tentativa+1}/3) =====")
+            logging.error(f"HTTP {e.code} {e.reason}")
+            logging.error(f"Resposta BRUTA da API: {body}")
+            logging.error("==========================================")
+
+            if e.code == 503 and tentativa < 2:
+                # espera crescente: 2s, 4s, 6s...
+                espera = 2 * (tentativa + 1)
+                logging.info(f"Modelo sobrecarregado (503). Aguardando {espera}s e tentando novamente...")
+                time.sleep(espera)
+                continue
+            else:
+                break
+
+        except Exception as e:
+            logging.error(f"===== FALHA AO PROCESSAR IA (urllib) para {cve} =====")
+            logging.error(f"Erro: {e}")
+            logging.error(f"Resposta BRUTA da API: {raw_response_text}")
+            logging.error("==========================================")
+            break
+
+    # Se chegou aqui, todas as tentativas falharam
+    fallback_desc = f"(Tradução falou) {descricao_en}"
+    fallback_sol = "Falha ao consultar a IA para uma solução."
+    return fallback_desc, fallback_sol
 
 
 
