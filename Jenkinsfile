@@ -108,57 +108,30 @@ pipeline {
         // Etapa 4: Geração de relatório com IA
         // ------------------------------------------
         stage('Gerar Relatório com IA') {
-            // Também só executa se o parâmetro de segurança estiver marcado
             when {
                 expression { return params.EXECUTAR_VERIFICACAO_SEGURANCA }
             }
-
-            // Define variáveis de ambiente disponíveis dentro da etapa
-            environment {
-                // Busca a credencial 'gemini-api-key' do Jenkins e
-                // atribui ao ambiente como variável 'API_KEY_GEMINI'
-                API_KEY_GEMINI = credentials('gemini-api-key')
-            }
-
             steps {
-                // Apenas exibe mensagem no console
-                echo "Executando script Python para gerar relatório HTML com IA..."
+                withCredentials([string(credentialsId: 'gemini-api-key', variable: 'API_KEY_GEMINI')]) {
+                bat '''
+                    cd /d "C:\\Users\\Carlos Eduardo\\Desktop\\Programacao\\Dependency-Check"
+                    echo Executando script Python para gerar relatório HTML com IA...
 
-                // Executa o script Python que usa a chave Gemini para gerar relatório inteligente
-                bat ' "C:/Users/Carlos Eduardo/AppData/Local/Programs/Python/Python313/python.exe" report/gerar_relatorio.py'
+                    REM Ajusta encoding
+                    set PYTHONIOENCODING=UTF-8
+
+                    REM Variáveis usadas pelo gerar_relatorio.py
+                    set API_KEY_GEMINI=%API_KEY_GEMINI%
+                    set GEMINI_MODEL=gemini-2.5-flash
+                    set JSON_INPUT_PATH=%WORKSPACE%\\target\\dependency-check-report.json
+                    set HTML_OUTPUT_PATH=%WORKSPACE%\\relatorio_vulnerabilidades.html
+
+                    REM Executa o script Python no workspace
+                    "C:\\Users\\Carlos Eduardo\\AppData\\Local\\Programs\\Python\\Python313\\python.exe" report\\gerar_relatorio.py
+                '''
+                }
             }
         }
-
-        stage('Gerar relatório (Gemini via Python local)') {
-  steps {
-    withCredentials([string(credentialsId: 'gemini-api-key', variable: 'API_KEY_GEMINI')]) {
-      bat '''
-        REM Vai para a pasta REAL do projeto
-        cd /d "C:\\Users\\Carlos Eduardo\\Desktop\\Programacao\\Dependency-Check"
-
-        REM Ajusta encoding
-        set PYTHONIOENCODING=UTF-8
-
-        REM Seta chave do Gemini e modelo
-        set API_KEY_GEMINI=%API_KEY_GEMINI%
-        set GEMINI_MODEL=gemini-2.5-flash
-
-        REM Diz pro script onde está o JSON gerado pelo Maven (no workspace do Jenkins)
-        set JSON_INPUT_PATH=%WORKSPACE%\\target\\dependency-check-report.json
-
-        REM Opcional: salvar o HTML também no workspace do Jenkins
-        set HTML_OUTPUT_PATH=%WORKSPACE%\\relatorio_vulnerabilidades.html
-
-        REM Executa seu script com o Python instalado no usuário
-        "C:\\Users\\Carlos Eduardo\\AppData\\Local\\Programs\\Python\\Python313\\python.exe" report\\gerar_relatorio.py
-      '''
-    }
-  }
-}
-
-
-
-
 
 
 
