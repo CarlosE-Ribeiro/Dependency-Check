@@ -141,7 +141,7 @@ pipeline {
 
         REM Seta chave do Gemini e modelo
         set API_KEY_GEMINI=%API_KEY_GEMINI%
-        set GEMINI_MODEL=gemini-1.5-flash-latest
+        set GEMINI_MODEL=gemini-2.5-flash
 
         REM Diz pro script onde está o JSON gerado pelo Maven (no workspace do Jenkins)
         set JSON_INPUT_PATH=%WORKSPACE%\\target\\dependency-check-report.json
