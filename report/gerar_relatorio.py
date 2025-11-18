@@ -3,52 +3,76 @@ import os
 import logging
 import urllib.request
 import urllib.error
-import re
 import ssl
 import time
+import webbrowser
+import sys
 from pathlib import Path
 
-API_KEY = os.environ.get('API_KEY_GEMINI', 'ERRO_KEY_NAO_DEFINIDA')
-GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+# =========================
+# CONFIGURAÇÕES GERAIS
+# =========================
 
-JSON_INPUT_PATH = os.environ.get('JSON_INPUT_PATH', 'target/dependency-check-report.json')
-HTML_OUTPUT_PATH = os.environ.get('HTML_OUTPUT_PATH', 'relatorio_vulnerabilidades.html')
+API_KEY = os.environ.get("API_KEY_GEMINI", "ERRO_KEY_NAO_DEFINIDA")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Se o caminho do JSON for passado via linha de comando, usa ele.
+# Senão, usa um padrão (ajuste para o seu caminho real).
+if len(sys.argv) > 1:
+    JSON_INPUT_PATH = sys.argv[1]
+else:
+    JSON_INPUT_PATH = r"C:\Users\Carlos Eduardo\Desktop\Programacao\Dependency-Check\report\dependency-check-report.json"
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+# Caminho padrão de saída do HTML (pode ser no mesmo diretório do JSON)
+if len(sys.argv) > 2:
+    HTML_OUTPUT_PATH = sys.argv[2]
+else:
+    HTML_OUTPUT_PATH = str(Path(JSON_INPUT_PATH).parent / "relatorio_vulnerabilidades.html")
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-def analisar_json(filepath):
-    # ... (Esta função está 100% correta, não mexe) ...
+# =========================
+# LEITURA E ANÁLISE DO JSON
+# =========================
+
+def analisar_json(filepath: str):
+    """
+    Lê o JSON do Dependency-Check e extrai uma lista de vulnerabilidades no formato:
+    {
+      "cve": ...,
+      "severidade": ...,
+      "descricao_en": ...,
+      "dependencia": ...,
+      "score": ...
+    }
+    """
     logging.info(f"Analisando o arquivo JSON em: {filepath}")
     vulnerabilidades_encontradas = []
 
     try:
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        if 'dependencies' not in data:
+        if "dependencies" not in data:
+            logging.warning("JSON não possui a chave 'dependencies'.")
             return []
 
-        for dep in data['dependencies']:
-            if 'vulnerabilities' in dep and dep['vulnerabilities']:
-                dep_nome = dep.get('fileName', 'Dependência desconhecida')
+        for dep in data["dependencies"]:
+            if "vulnerabilities" in dep and dep["vulnerabilities"]:
+                dep_nome = dep.get("fileName", "Dependência desconhecida")
 
-                for vuln in dep['vulnerabilities']:
+                for vuln in dep["vulnerabilities"]:
                     score = "N/A"
-                    if 'cvssv3' in vuln and vuln['cvssv3'].get('baseScore'):
-                        score = vuln['cvssv3'].get('baseScore')
-                    elif 'cvssv2' in vuln and vuln['cvssv2'].get('score'):
-                        score = vuln['cvssv2'].get('score')
+                    if "cvssv3" in vuln and vuln["cvssv3"].get("baseScore"):
+                        score = vuln["cvssv3"].get("baseScore")
+                    elif "cvssv2" in vuln and vuln["cvssv2"].get("score"):
+                        score = vuln["cvssv2"].get("score")
 
                     vulnerabilidades_encontradas.append({
-                        "cve": vuln.get('name', 'N/A'),
-                        "severidade": vuln.get('severity', 'Desconhecida'),
-                        "descricao_en": vuln.get('description', 'Sem descrição.'),
+                        "cve": vuln.get("name", "N/A"),
+                        "severidade": vuln.get("severity", "Desconhecida"),
+                        "descricao_en": vuln.get("description", "Sem descrição."),
                         "dependencia": dep_nome,
                         "score": score
                     })
@@ -64,15 +88,27 @@ def analisar_json(filepath):
         return []
 
 
+# =========================
+# CHAMADA AO GEMINI (LOCAL)
+# =========================
+
 def obter_dados_ia(cve, dependencia, descricao_en):
     """
-    Consulta o Gemini em modo JSON para obter:
+    Consulta o Gemini (v1beta) em modo JSON para obter:
       - descricao_pt
       - solucao
 
-    Usa v1beta + responseMimeType=application/json para evitar texto solto.
+    Necessário:
+      - variável de ambiente API_KEY_GEMINI setada
+      - GEMINI_MODEL (ex: gemini-2.5-flash)
     """
     logging.info(f"Consultando IA (via urllib) para dados da {cve}...")
+
+    if API_KEY == "ERRO_KEY_NAO_DEFINIDA":
+        logging.error("API_KEY_GEMINI não definida na máquina local.")
+        fallback_desc = f"(Sem IA) {descricao_en}"
+        fallback_sol = "Configure a variável de ambiente API_KEY_GEMINI para usar a IA."
+        return fallback_desc, fallback_sol
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
     logging.info(f"VERIFICAÇÃO DE URL: Estou chamando: {url}")
@@ -106,16 +142,17 @@ Exemplo de formato:
                 "parts": [{"text": prompt_texto}]
             }
         ],
-        # Força saída em JSON:
-        "responseMimeType": "application/json",
-        "responseSchema": {
-            "type": "OBJECT",
-            "properties": {
-                "descricao_pt": {"type": "STRING"},
-                "solucao": {"type": "STRING"}
-            },
-            "required": ["descricao_pt", "solucao"]
-        },
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": {
+                "type": "OBJECT",
+                "properties": {
+                    "descricao_pt": {"type": "STRING"},
+                    "solucao": {"type": "STRING"}
+                },
+                "required": ["descricao_pt", "solucao"]
+            }
+        }
     }
 
     data = json.dumps(payload).encode("utf-8")
@@ -135,9 +172,7 @@ Exemplo de formato:
                 raw_response_text = response_body
                 response_json = json.loads(response_body)
 
-                # Em JSON mode, o modelo devolve JSON puro em parts[0].text
                 texto_json = response_json["candidates"][0]["content"]["parts"][0]["text"]
-
                 dados_ia = json.loads(texto_json)
 
                 return (
@@ -157,6 +192,7 @@ Exemplo de formato:
             logging.error(f"Resposta BRUTA da API: {body}")
             logging.error("==========================================")
 
+            # Se for modelo sobrecarregado, tenta de novo
             if e.code == 503 and tentativa < 2:
                 espera = 2 * (tentativa + 1)
                 logging.info(f"Modelo sobrecarregado (503). Aguardando {espera}s e tentando novamente...")
@@ -178,118 +214,150 @@ Exemplo de formato:
     return fallback_desc, fallback_sol
 
 
-def gerar_relatorio_html(dados_finais, output_path):
-    # ... (Esta função está 100% correta, não mexe) ...
+# =========================
+# GERAÇÃO DO HTML + ABRIR NO NAVEGADOR
+# =========================
+
+def gerar_relatorio_html(dados_finais, output_path, abrir_navegador=True):
     logging.info(f"Gerando relatório HTML em: {output_path}")
 
     html_style = """
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background-color: #f9f9f9; color: #333; }
-        h1 { color: #004a9e; border-bottom: 2px solid #004a9e; padding-bottom: 5px; }
-        p { font-size: 0.9em; color: #555; }
-        table { width: 100%; border-collapse: collapse; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 25px; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; vertical-align: top; }
-        th { background-color: #f0f0f0; color: #333; font-weight: 600; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 20px;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        h1 {
+            color: #004a9e;
+            border-bottom: 2px solid #004a9e;
+            padding-bottom: 5px;
+        }
+        p {
+            font-size: 0.9em;
+            color: #555;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 25px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background-color: #f0f0f0;
+            font-weight: 600;
+        }
         tr:nth-child(even) { background-color: #fdfdfd; }
         tr:nth-child(odd) { background-color: #f7f7f7; }
         tr:hover { background-color: #e6f0ff; }
-        .col-cve { width: 12%; }
-        .col-score { width: 6%; }
-        .col-sev { width: 8%; }
-        .col-desc { width: 44%; }
-        .col-sol { width: 30%; }
         .severity-CRITICAL { color: #D73A49; font-weight: bold; }
         .severity-HIGH { color: #F56A00; font-weight: bold; }
-        .severity-MODERATE { color: #DBAB09; }
+        .severity-MEDIUM, .severity-MODERATE { color: #DBAB09; }
         .severity-LOW { color: #31704B; }
     </style>
     """
 
-    table_rows = ""
+    linhas = []
     for item in dados_finais:
-        severidade_class = f"severity-{item['severidade'].upper()}"
-        table_rows += f"""
+        sev_upper = (item["severidade"] or "").upper()
+        severidade_class = f"severity-{sev_upper}"
+        linhas.append(f"""
         <tr>
-            <td class="col-cve">{item['cve']}</td>
-            <td class="col-score" style="text-align: center;"><b>{item['score']}</b></td>
-            <td class="col-sev {severidade_class}">{item['severidade']}</td>
-            <td class="col-desc">{item['descricao_pt']}</td>
-            <td class="col-sol">{item['solucao']}</td>
+            <td>{item['cve']}</td>
+            <td style="text-align:center;"><b>{item['score']}</b></td>
+            <td class="{severidade_class}">{item['severidade']}</td>
+            <td>{item['descricao_pt']}</td>
+            <td>{item['solucao']}</td>
         </tr>
-        """
+        """)
 
-    html_content = f"""
+    html = f"""
     <html>
     <head>
-        <title>Relatório de Vulnerabilidades</title>
-        <meta charset="UTF-8">
-        {html_style}
+      <meta charset="UTF-8">
+      <title>Relatório de Vulnerabilidades</title>
+      {html_style}
     </head>
     <body>
-        <h1>Relatório de Análise de Vulnerabilidades</h1>
-        <p>Este relatório foi gerado processando a saída do OWASP Dependency-Check e consultando a IA (Gemini) para traduções e soluções.</p>
-        <table>
-            <thead>
-                <tr>
-                    <th class="col-cve">CVE</th>
-                    <th class="col-score">Score</th>
-                    <th class="col-sev">Severidade</th>
-                    <th class="col-desc">Descrição (Traduzida)</th>
-                    <th class="col-sol">Solução Recomendada (IA)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {table_rows}
-            </tbody>
-        </table>
+      <h1>Relatório de Análise de Vulnerabilidades</h1>
+      <p>Relatório gerado a partir do OWASP Dependency-Check e da IA (Gemini).</p>
+      <table>
+        <thead>
+          <tr>
+            <th>CVE</th>
+            <th>Score</th>
+            <th>Severidade</th>
+            <th>Descrição (PT-BR)</th>
+            <th>Solução Recomendada</th>
+          </tr>
+        </thead>
+        <tbody>
+          {''.join(linhas)}
+        </tbody>
+      </table>
     </body>
     </html>
     """
 
+    saida = Path(output_path)
     try:
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(html_content)
-        logging.info(f"Relatório salvo com sucesso em {Path(output_path).resolve()}!")
+        saida.write_text(html, encoding="utf-8")
+        logging.info(f"Relatório salvo com sucesso em {saida.resolve()}!")
     except Exception as e:
         logging.error(f"Falha ao salvar o arquivo HTML. Erro: {e}")
-
-
-def main():
-    # ... (Esta função está 100% correta, não mexe) ...
-    if API_KEY == 'ERRO_KEY_NAO_DEFINIDA':
-        logging.error("A variável de ambiente 'API_KEY_GEMINI' não foi definida no Jenkins.")
         return
 
+    if abrir_navegador:
+        try:
+            url = saida.resolve().as_uri()
+            logging.info(f"Abrindo relatório no navegador: {url}")
+            webbrowser.open(url, new=2)
+        except Exception as e:
+            logging.error(f"Falha ao abrir o relatório no navegador. Erro: {e}")
+
+
+# =========================
+# MAIN
+# =========================
+
+def main():
+    logging.info(f"Usando JSON em: {JSON_INPUT_PATH}")
+    logging.info(f"HTML de saída: {HTML_OUTPUT_PATH}")
     vulnerabilidades = analisar_json(JSON_INPUT_PATH)
     if not vulnerabilidades:
-        logging.info("Nenhuma vulnerabilidade encontrada ou o arquivo JSON está vazio. Saindo.")
+        logging.info("Nenhuma vulnerabilidade encontrada no JSON.")
         return
 
     dados_com_solucao = []
     for vuln in vulnerabilidades:
-        if vuln['severidade'] in ['LOW', 'Desconhecida']:
-            logging.info(f"Pulando {vuln['cve']} (Severidade: {vuln['severidade']}).")
-            continue
-
+        # Se quiser pular LOW, pode usar:
+        # if vuln["severidade"] in ["LOW", "Desconhecida"]:
+        #     continue
         descricao_pt, solucao = obter_dados_ia(
-            vuln['cve'],
-            vuln['dependencia'],
-            vuln['descricao_en']
+            vuln["cve"],
+            vuln["dependencia"],
+            vuln["descricao_en"]
         )
-
         dados_com_solucao.append({
-            "cve": vuln['cve'],
-            "severidade": vuln['severidade'],
-            "score": vuln['score'],
+            "cve": vuln["cve"],
+            "severidade": vuln["severidade"],
+            "score": vuln["score"],
             "descricao_pt": descricao_pt,
             "solucao": solucao
         })
 
     if not dados_com_solucao:
-        logging.info("Nenhuma vulnerabilidade (Moderada ou superior) encontrada para gerar relatório.")
+        logging.info("Nenhuma vulnerabilidade processada pela IA para gerar relatório.")
         return
 
-    gerar_relatorio_html(dados_com_solucao, HTML_OUTPUT_PATH)
+    gerar_relatorio_html(dados_com_solucao, HTML_OUTPUT_PATH, abrir_navegador=True)
 
 
 if __name__ == "__main__":

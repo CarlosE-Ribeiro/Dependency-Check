@@ -1,0 +1,76 @@
+
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Relatório de Vulnerabilidades</title>
+      
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 20px;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        h1 {
+            color: #004a9e;
+            border-bottom: 2px solid #004a9e;
+            padding-bottom: 5px;
+        }
+        p {
+            font-size: 0.9em;
+            color: #555;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 25px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background-color: #f0f0f0;
+            font-weight: 600;
+        }
+        tr:nth-child(even) { background-color: #fdfdfd; }
+        tr:nth-child(odd) { background-color: #f7f7f7; }
+        tr:hover { background-color: #e6f0ff; }
+        .severity-CRITICAL { color: #D73A49; font-weight: bold; }
+        .severity-HIGH { color: #F56A00; font-weight: bold; }
+        .severity-MEDIUM, .severity-MODERATE { color: #DBAB09; }
+        .severity-LOW { color: #31704B; }
+    </style>
+    
+    </head>
+    <body>
+      <h1>Relatório de Análise de Vulnerabilidades</h1>
+      <p>Relatório gerado a partir do OWASP Dependency-Check e da IA (Gemini).</p>
+      <table>
+        <thead>
+          <tr>
+            <th>CVE</th>
+            <th>Score</th>
+            <th>Severidade</th>
+            <th>Descrição (PT-BR)</th>
+            <th>Solução Recomendada</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+        <tr>
+            <td>CVE-2015-6420</td>
+            <td style="text-align:center;"><b>7.5</b></td>
+            <td class="severity-HIGH">HIGH</td>
+            <td>A CVE-2015-6420 é uma vulnerabilidade crítica de desserialização que afeta diversos produtos Cisco que utilizam a biblioteca Apache Commons Collections, especificamente a versão 3.2.1. Atacantes remotos podem explorar esta falha ao enviar objetos Java serializados maliciosos. Isso permite a execução de comandos arbitrários no sistema alvo. A vulnerabilidade reside na manipulação insegura de objetos serializados pela biblioteca ACC.</td>
+            <td>A principal solução é atualizar a dependência Apache Commons Collections para uma versão que não seja vulnerável, como a versão 3.2.2 ou 4.1 e superiores. Para os produtos Cisco afetados, é fundamental aplicar as atualizações de software ou patches de segurança fornecidos pelo fabricante. Como medida adicional, pode-se considerar a implementação de filtragem de desserialização para permitir apenas a desserialização de classes conhecidas e seguras.</td>
+        </tr>
+        
+        </tbody>
+      </table>
+    </body>
+    </html>
+    
