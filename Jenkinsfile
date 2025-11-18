@@ -94,7 +94,7 @@ pipeline {
 
                     try {
                         // Executa a verificação de dependências com base no limite definido pelo usuário
-                        bat "mvn org.owasp:dependency-check-maven:check -Dowasp.fail.threshold=${params.LIMITE_CVSS_FALHA}"
+                        bat "mvn org.owasp:dependency-check-maven:check -Dowasp.fail.threshold>${params.LIMITE_CVSS_FALHA}"
                     } catch (e) {
                         // Se o comando acima retornar erro (falhas encontradas), o build é marcado como FAILED
                         currentBuild.result = 'FAILURE'
