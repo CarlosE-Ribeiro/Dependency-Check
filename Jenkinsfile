@@ -82,27 +82,42 @@ pipeline {
         // Etapa 3: Verificação de vulnerabilidades
         // ------------------------------------------
         stage('Dependency check') {
-            // Só executa se o parâmetro EXECUTAR_VERIFICACAO_SEGURANCA estiver marcado
-            when {
-                expression { return params.EXECUTAR_VERIFICACAO_SEGURANCA }
+    when {
+        expression { return params.EXECUTAR_VERIFICACAO_SEGURANCA }
+    }
+
+    steps {
+        script {
+            // Atualiza banco local de CVEs
+            bat "mvn org.owasp:dependency-check-maven:update-only"
+
+            // Lê o valor digitado no parâmetro (String -> BigDecimal)
+            def userLimit = params.LIMITE_CVSS_FALHA as BigDecimal
+
+            // Se for 10, manda 11 pro plugin (nada falha)
+            // Senão, manda userLimit + 0.01 para simular "maior que"
+            BigDecimal effectiveThreshold
+            if (userLimit >= 10) {
+                effectiveThreshold = 11.0
+            } else {
+                effectiveThreshold = userLimit + 0.01
             }
 
-            steps {
-                script {
-                    // Atualiza o banco de dados de CVEs do OWASP Dependency-Check
-                    bat "mvn org.owasp:dependency-check-maven:update-only"
+            echo "Limite informado pelo usuário: ${userLimit}"
+            echo "Threshold efetivo enviado ao Dependency-Check: ${effectiveThreshold}"
 
-                    try {
-                        // Executa a verificação de dependências com base no limite definido pelo usuário
-                        bat "mvn org.owasp:dependency-check-maven:check -Dowasp.fail.threshold>${params.LIMITE_CVSS_FALHA}"
-                    } catch (e) {
-                        // Se o comando acima retornar erro (falhas encontradas), o build é marcado como FAILED
-                        currentBuild.result = 'FAILURE'
-                        error("Pipeline falhou devido a vulnerabilidades acima do score: ${params.LIMITE_CVSS_FALHA}")
-                    }
-                }
+            try {
+                // Aqui usamos a user property do plugin: failBuildOnCVSS
+                bat "mvn org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=${effectiveThreshold}"
+            } catch (e) {
+                currentBuild.result = 'FAILURE'
+                error("Pipeline falhou devido a vulnerabilidades com score acima de ${userLimit}")
             }
         }
+    }
+}
+
+
 
         // ------------------------------------------
         // Etapa 4: Baixando JSON

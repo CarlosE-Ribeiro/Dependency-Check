@@ -87,8 +87,6 @@
         <version>12.1.6</version> <configuration>
           <format>ALL</format>
 
-          <failBuildOnCVSS>${owasp.fail.threshold}</failBuildOnCVSS>
-
         </configuration>
       </plugin>
   
