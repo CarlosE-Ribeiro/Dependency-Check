@@ -82,47 +82,49 @@ pipeline {
         // Etapa 3: Verificação de vulnerabilidades
         // ------------------------------------------
         stage('Dependency check') {
-    when {
-        expression { return params.EXECUTAR_VERIFICACAO_SEGURANCA }
-    }
-
-    steps {
-        script {
-            // Atualiza banco local de CVEs
-            bat "mvn org.owasp:dependency-check-maven:update-only"
-
-            // Lê o valor digitado no parâmetro (String -> BigDecimal)
-            def userLimit = params.LIMITE_CVSS_FALHA as BigDecimal
-
-            // Se for 10, manda 11 pro plugin (nada falha)
-            // Senão, manda userLimit + 0.01 para simular "maior que"
-            BigDecimal effectiveThreshold
-            if (userLimit >= 10) {
-                effectiveThreshold = 11.0
-            } else {
-                effectiveThreshold = userLimit + 0.01
+            when {
+                expression { return params.EXECUTAR_VERIFICACAO_SEGURANCA }
             }
 
-            echo "Limite informado pelo usuário: ${userLimit}"
-            echo "Threshold efetivo enviado ao Dependency-Check: ${effectiveThreshold}"
+            steps {
+                script {
+                    // Atualiza banco local de CVEs
+                    bat "mvn org.owasp:dependency-check-maven:update-only"
 
-            try {
-                // Aqui usamos a user property do plugin: failBuildOnCVSS
-                bat "mvn org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=${effectiveThreshold}"
-            } catch (e) {
-                currentBuild.result = 'FAILURE'
-                error("Pipeline falhou devido a vulnerabilidades com score acima de ${userLimit}")
+                    // Lê o valor digitado no parâmetro (String -> BigDecimal)
+                    def userLimit = params.LIMITE_CVSS_FALHA as BigDecimal
+
+                    // Se for 10, manda 11 pro plugin (nada falha)
+                    // Senão, manda userLimit + 0.01 para simular "maior que"
+                    BigDecimal effectiveThreshold
+                    if (userLimit >= 10) {
+                        effectiveThreshold = 11.0
+                    } else {
+                        effectiveThreshold = userLimit + 0.01
+                    }
+
+                    echo "Limite informado pelo usuário: ${userLimit}"
+                    echo "Threshold efetivo enviado ao Dependency-Check: ${effectiveThreshold}"
+
+                    try {
+                        // Aqui usamos a user property do plugin: failBuildOnCVSS
+                        bat "mvn org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=${effectiveThreshold}"
+                    } catch (e) {
+                        currentBuild.result = 'FAILURE'
+                        error("Pipeline falhou devido a vulnerabilidades com score acima de ${userLimit}")
+                    }
+                }
             }
         }
-    }
-}
-
 
 
         // ------------------------------------------
         // Etapa 4: Baixando JSON
         // ------------------------------------------
         stage('Copiar JSON para máquina local') {
+            when {
+                expression { return params.EXECUTAR_VERIFICACAO_SEGURANCA }
+            }
             steps {
                 bat """
                     echo Copiando JSON gerado para sua pasta local...
@@ -130,8 +132,6 @@ pipeline {
                 """
             }
         }
-
-
 
 
     } // <-- Fim das etapas (stages)

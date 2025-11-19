@@ -62,11 +62,35 @@
         <tbody>
           
         <tr>
-            <td>CVE-2015-6420</td>
-            <td style="text-align:center;"><b>7.5</b></td>
-            <td class="severity-HIGH">HIGH</td>
-            <td>A CVE-2015-6420 é uma vulnerabilidade de desserialização que afeta a biblioteca Apache Commons Collections, incluindo a versão 3.2.1. Esta falha permite que atacantes remotos executem comandos arbitrários. Isso ocorre ao enviar objetos Java serializados maliciosos para aplicações que utilizam a biblioteca vulnerável. Diversos produtos Cisco foram impactados por esta vulnerabilidade, abrindo portas para controle indevido do sistema.</td>
-            <td>A principal solução é atualizar a biblioteca Apache Commons Collections para uma versão corrigida, como 3.2.2 ou superior. Recomenda-se aplicar quaisquer patches ou atualizações de software fornecidos pelos fabricantes dos produtos que utilizam essa dependência. Como medida de mitigação, pode-se implementar restrições de desserialização, permitindo apenas classes de fontes confiáveis ou aplicando o uso de listas de permissão (whitelisting) para a desserialização de objetos.</td>
+            <td>CVE-2021-44228</td>
+            <td style="text-align:center;"><b>10.0</b></td>
+            <td class="severity-CRITICAL">CRITICAL</td>
+            <td>A vulnerabilidade CVE-2021-44228 (Log4Shell) afeta o Apache Log4j2 nas versões 2.0-beta9 a 2.15.0, excluindo lançamentos de segurança. Ela permite a execução remota de código (RCE) através de funcionalidades JNDI que não protegem contra endpoints LDAP controlados por atacantes. Um atacante pode injetar código malicioso em mensagens ou parâmetros de log, levando ao carregamento e execução de código arbitrário. Esta falha é específica do módulo log4j-core.</td>
+            <td>1. Atualize a dependência log4j-core para a versão 2.16.0 ou superior para remover completamente a funcionalidade vulnerável. 2. Alternativamente, atualize para as versões de segurança 2.12.2, 2.12.3 ou 2.3.1. 3. Se a atualização não for imediata, para a versão 2.15.0, o comportamento já está desabilitado por padrão. Para versões anteriores, defina a propriedade de sistema log4j2.formatMsgNoLookups=true ou remova a classe JndiLookup do classpath.</td>
+        </tr>
+        
+        <tr>
+            <td>CVE-2021-45046</td>
+            <td style="text-align:center;"><b>9.0</b></td>
+            <td class="severity-CRITICAL">CRITICAL</td>
+            <td>A CVE-2021-45046 revela que a correção da CVE-2021-44228 no Apache Log4j 2.15.0 era incompleta em certas configurações não padrão. Atacantes com controle sobre dados de entrada do Thread Context Map (MDC) podem criar entradas maliciosas usando padrões de JNDI Lookup. Isso é possível quando a configuração de log usa um Pattern Layout não padrão com Context Lookup ou um padrão Thread Context Map. A exploração pode resultar em vazamento de informações, execução remota de código (RCE) e execução local de código (LCE).</td>
+            <td>Atualize a biblioteca Log4j para a versão 2.16.0 se estiver usando Java 8, ou para a versão 2.12.2 se estiver usando Java 7. Essas versões corrigem a vulnerabilidade removendo o suporte a padrões de pesquisa de mensagens e desabilitando a funcionalidade JNDI por padrão.</td>
+        </tr>
+        
+        <tr>
+            <td>CVE-2021-44832</td>
+            <td style="text-align:center;"><b>6.6</b></td>
+            <td class="severity-MEDIUM">MEDIUM</td>
+            <td>Esta é uma vulnerabilidade de execução remota de código (RCE) no Apache Log4j2, afetando as versões 2.0-beta7 até 2.17.0 (excluindo 2.3.2 e 2.12.4). Ela ocorre quando uma configuração utiliza um JDBC Appender com uma URI de fonte de dados JNDI LDAP. Um atacante pode explorar esta falha se tiver controle do servidor LDAP de destino, levando à execução de código arbitrário.</td>
+            <td>Para mitigar esta vulnerabilidade, atualize o Apache Log4j2 para as versões 2.17.1, 2.12.4 ou 2.3.2, ou qualquer versão posterior que contenha a correção. Estas versões limitam os nomes das fontes de dados JNDI ao protocolo "java", impedindo a exploração. Para a dependência log4j-core-2.14.1.jar, que está na faixa vulnerável, a atualização para uma versão corrigida é essencial.</td>
+        </tr>
+        
+        <tr>
+            <td>CVE-2021-45105</td>
+            <td style="text-align:center;"><b>5.9</b></td>
+            <td class="severity-MEDIUM">MEDIUM</td>
+            <td>A vulnerabilidade CVE-2021-45105 no Apache Log4j2 afeta as versões de 2.0-alpha1 a 2.16.0 (excluindo 2.12.3 e 2.3.1). Ela decorre de uma recursão descontrolada por meio de lookups auto-referenciais. Um atacante com controle sobre os dados do Thread Context Map pode injetar uma string maliciosa. Isso pode levar a uma condição de Negação de Serviço (DoS) ao ser interpretada.</td>
+            <td>Atualize o Apache Log4j2 para a versão 2.17.0 ou superior. Alternativamente, as versões 2.12.3 e 2.3.1 também incluem a correção para esta vulnerabilidade.</td>
         </tr>
         
         </tbody>
