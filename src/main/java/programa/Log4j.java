@@ -4,7 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 public class Log4j {
-    private static final Logger logger = LogManager.getLogger(Teste.class);
+    private static final Logger logger = LogManager.getLogger(Log4j.class);
 
     public static void main(String[] args) {
         System.out.println("Iniciando aplicação de teste de vulnerabilidade...");
