@@ -143,22 +143,28 @@ pipeline {
         always {
             echo "Arquivando relatórios de segurança..."
 
-            // Arquiva os relatórios do OWASP Dependency-Check em vários formatos
+            // Arquiva mesmo que não tenha (allowEmptyArchive já cuida disso)
             archiveArtifacts artifacts: 'target/dependency-check-report.html, target/dependency-check-report.json, target/dependency-check-report.xml',
-                             allowEmptyArchive: true
+                            allowEmptyArchive: true
 
-            // Publica o XML para o plugin "OWASP Dependency Check" gerar gráficos no Jenkins
-            dependencyCheckPublisher pattern: 'target/dependency-check-report.xml'
+            // Só tenta publicar o Dependency-Check se a verificação rodou
+            script {
+                if (params.EXECUTAR_VERIFICACAO_SEGURANCA) {
+                    dependencyCheckPublisher pattern: 'target/dependency-check-report.xml'
+                } else {
+                    echo "Dependency-Check não foi executado; pulando publicação do relatório XML no Jenkins."
+                }
+            }
 
-            // Arquiva o relatório final gerado com IA
-                    publishHTML(target: [
-                        allowMissing: true,
-                        alwaysLinkToLastBuild: true,
-                        keepAll: true,
-                        reportDir: '.', // Pasta onde o relatório está (raiz do workspace)
-                        reportFiles: 'relatorio_vulnerabilidades.html', // O nome do seu arquivo
-                        reportName: 'Relatório de Vulnerabilidades (IA)' // O nome que vai aparecer no link
-                    ])
+            // Esse já está com allowMissing: true, então não quebra se o HTML de IA não existir
+            publishHTML(target: [
+                allowMissing: true,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: '.',
+                reportFiles: 'relatorio_vulnerabilidades.html',
+                reportName: 'Relatório de Vulnerabilidades (IA)'
+            ])
         }
     }
 }
